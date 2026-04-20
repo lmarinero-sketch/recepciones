@@ -1,0 +1,195 @@
+/**
+ * Servicio de Autenticación
+ * 
+ * Login/logout con verificación de password via Supabase RPC (pgcrypto).
+ * Sesión persistida en localStorage.
+ * Máximo ~10 usuarios, todos con mismo rol.
+ */
+import { supabase } from '../lib/supabase';
+import { trackLogin, trackLogout } from '../lib/hubTracker';
+
+const SESSION_KEY = 'admqui_session';
+
+// =============================================
+// SESSION MANAGEMENT
+// =============================================
+
+/**
+ * Obtiene el usuario actual de localStorage
+ * @returns {{ id: string, usuario: string, nombre: string, iniciales: string } | null}
+ */
+export function getCurrentUser() {
+    try {
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        const session = JSON.parse(raw);
+        // Validar que tiene los campos mínimos
+        if (!session?.id || !session?.usuario) return null;
+        return session;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Verifica si hay un usuario logueado
+ */
+export function isAuthenticated() {
+    return getCurrentUser() !== null;
+}
+
+
+// =============================================
+// LOGIN / LOGOUT
+// =============================================
+
+/**
+ * Intenta login con usuario y contraseña
+ * @param {string} usuario
+ * @param {string} password
+ * @returns {{ success: boolean, user?: object, error?: string }}
+ */
+export async function login(usuario, password) {
+    if (!usuario || !password) {
+        return { success: false, error: 'Usuario y contraseña son requeridos' };
+    }
+
+    try {
+        // Si el usuario ingresa un email, extraer solo la parte antes del @
+        let normalizedUser = usuario.trim().toLowerCase();
+        if (normalizedUser.includes('@')) {
+            normalizedUser = normalizedUser.split('@')[0];
+        }
+
+        const { data, error } = await supabase.rpc('verify_login', {
+            p_usuario: normalizedUser,
+            p_password: password,
+        });
+
+        if (error) {
+            console.error('[AuthService] RPC error:', error);
+            return { success: false, error: 'Error de conexión. Intente nuevamente.' };
+        }
+
+        if (!data || data.length === 0) {
+            return { success: false, error: 'Usuario o contraseña incorrectos' };
+        }
+
+        const user = data[0];
+        const session = {
+            id: user.id,
+            usuario: user.usuario,
+            nombre: user.nombre,
+            iniciales: user.iniciales || user.nombre.charAt(0).toUpperCase(),
+            loginAt: new Date().toISOString(),
+        };
+
+        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+
+        // Track in Hub Monitor (non-blocking)
+        trackLogin(supabase, user.usuario);
+
+        return { success: true, user: session };
+    } catch (err) {
+        console.error('[AuthService] Login error:', err);
+        return { success: false, error: 'Error inesperado: ' + err.message };
+    }
+}
+
+/**
+ * Cierra la sesión del usuario
+ */
+export function logout() {
+    const user = getCurrentUser();
+    if (user) trackLogout(supabase, user.usuario);
+    localStorage.removeItem(SESSION_KEY);
+}
+
+
+// =============================================
+// USER MANAGEMENT (Admin)
+// =============================================
+
+/**
+ * Crea un nuevo usuario (solo admin)
+ */
+export async function createUser(usuario, nombre, password, iniciales = null) {
+    const { data, error } = await supabase.rpc('create_user', {
+        p_usuario: usuario,
+        p_nombre: nombre,
+        p_password: password,
+        p_iniciales: iniciales,
+    });
+
+    if (error) {
+        if (error.message?.includes('duplicate') || error.message?.includes('uq_usuarios')) {
+            throw new Error(`El usuario "${usuario}" ya existe`);
+        }
+        throw new Error(error.message);
+    }
+
+    return data;
+}
+
+/**
+ * Lista todos los usuarios
+ */
+export async function listUsers() {
+    const { data, error } = await supabase
+        .from('admqui_usuarios')
+        .select('id, usuario, nombre, iniciales, activo, ultimo_login, created_at')
+        .order('nombre');
+
+    if (error) throw new Error(error.message);
+    return data || [];
+}
+
+/**
+ * Desactiva/activa un usuario
+ */
+export async function toggleUserActive(userId, activo) {
+    const { error } = await supabase
+        .from('admqui_usuarios')
+        .update({ activo })
+        .eq('id', userId);
+
+    if (error) throw new Error(error.message);
+}
+
+
+/**
+ * Cambia la contraseña del usuario
+ * @param {string} userId - UUID del usuario
+ * @param {string} oldPassword - Contraseña actual
+ * @param {string} newPassword - Nueva contraseña
+ * @returns {{ success: boolean, error?: string }}
+ */
+export async function changePassword(userId, oldPassword, newPassword) {
+    if (!oldPassword || !newPassword) {
+        return { success: false, error: 'Ambas contraseñas son requeridas' };
+    }
+    if (newPassword.length < 4) {
+        return { success: false, error: 'La nueva contraseña debe tener al menos 4 caracteres' };
+    }
+
+    try {
+        const { data, error } = await supabase.rpc('change_password', {
+            p_user_id: userId,
+            p_old_password: oldPassword,
+            p_new_password: newPassword,
+        });
+
+        if (error) {
+            console.error('[AuthService] Change password error:', error);
+            return { success: false, error: 'Error de conexión. Intente nuevamente.' };
+        }
+
+        if (data === false) {
+            return { success: false, error: 'La contraseña actual es incorrecta' };
+        }
+
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: 'Error: ' + err.message };
+    }
+}
