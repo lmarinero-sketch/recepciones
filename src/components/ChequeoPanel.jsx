@@ -5,7 +5,7 @@ import {
     MessageSquare, UserCheck, Activity, Heart, CheckCircle2, XCircle, Loader2,
     CalendarClock, ChevronLeft, ArrowLeft, ArrowRight
 } from 'lucide-react';
-import { fetchPacientesChequeo, updateAsistencia } from '../services/visitasService';
+import { fetchPacientesChequeo, updateAsistencia, fetchObrasSociales } from '../services/visitasService';
 import ChatWindow from './ChatWindow';
 
 // Calcula la fecha de hoy - 1 año en formato YYYY-MM-DD
@@ -15,9 +15,13 @@ function getOneYearAgoToday() {
     return d.toISOString().split('T')[0];
 }
 
-function shiftDate(dateStr, days) {
+function shiftDate(dateStr, amount, isMensual) {
     const d = new Date(dateStr + 'T00:00:00');
-    d.setDate(d.getDate() + days);
+    if (isMensual) {
+        d.setMonth(d.getMonth() + (amount > 0 ? 1 : -1));
+    } else {
+        d.setDate(d.getDate() + amount);
+    }
     return d.toISOString().split('T')[0];
 }
 
@@ -44,12 +48,22 @@ export default function ChequeoPanel({ addToast }) {
     const [bulkProgress, setBulkProgress] = useState({ sent: 0, failed: 0, total: 0 });
     const bulkAbortRef = useRef(false);
 
+    const [isMensual, setIsMensual] = useState(false);
+    const [obraSocial, setObraSocial] = useState('');
+    const [obrasSocialesList, setObrasSocialesList] = useState([]);
+
+    useEffect(() => {
+        fetchObrasSociales().then(setObrasSocialesList).catch(console.error);
+    }, []);
+
     const loadData = useCallback(async () => {
         setLoading(true);
         setLoadProgress('Buscando chequeos preventivos...');
         try {
             const data = await fetchPacientesChequeo({
                 targetDate,
+                isMensual,
+                obraSocial
             }, (_pages, _rows, msg) => {
                 setLoadProgress(msg || 'Cargando...');
             });
@@ -61,7 +75,7 @@ export default function ChequeoPanel({ addToast }) {
         } finally {
             setLoading(false);
         }
-    }, [targetDate, addToast]);
+    }, [targetDate, isMensual, obraSocial, addToast]);
 
     useEffect(() => {
         loadData();
@@ -213,6 +227,12 @@ export default function ChequeoPanel({ addToast }) {
         return d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     };
 
+    const formatDateMonth = (dateStr) => {
+        if (!dateStr) return '-';
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    };
+
     const formatPhone = (phone) => {
         if (!phone) return null;
         if (phone.length === 13 && phone.startsWith('549')) {
@@ -290,7 +310,7 @@ export default function ChequeoPanel({ addToast }) {
                     </div>
                 </div>
 
-                {/* Date Navigator — navegar día a día */}
+                {/* Date Navigator */}
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px',
                     padding: '12px 18px', borderRadius: '12px',
@@ -300,37 +320,42 @@ export default function ChequeoPanel({ addToast }) {
                     <CalendarClock size={20} color="#1d4ed8" />
                     <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                            Pacientes con Chequeo Preventivo (CHQ) el día:
+                            Pacientes con Chequeo Preventivo (CHQ) el {isMensual ? 'mes' : 'día'}:
                         </div>
-                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d4ed8' }}>
-                            {formatDateLong(targetDate)}
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'capitalize' }}>
+                            {isMensual ? formatDateMonth(targetDate) : formatDateLong(targetDate)}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
                             Recordatorio anual → deben volver en {reminderYear}
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <button onClick={() => { setTargetDate(d => shiftDate(d, -1)); setSelectedPaciente(null); }} disabled={loading} style={{
+                        <button onClick={() => { setTargetDate(d => shiftDate(d, -1, isMensual)); setSelectedPaciente(null); }} disabled={loading} style={{
                             width: '36px', height: '36px', borderRadius: '8px', border: '1px solid #dbeafe',
                             background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center',
                             justifyContent: 'center', color: '#3b82f6', transition: 'all .15s',
                         }}><ArrowLeft size={16} /></button>
 
-                        <input type="date" value={targetDate}
-                            onChange={e => { if (e.target.value) { setTargetDate(e.target.value); setSelectedPaciente(null); } }}
+                        <input type={isMensual ? "month" : "date"} value={isMensual ? targetDate.substring(0, 7) : targetDate}
+                            onChange={e => { if (e.target.value) { setTargetDate(isMensual ? e.target.value + '-01' : e.target.value); setSelectedPaciente(null); } }}
                             style={{
                                 padding: '6px 10px', borderRadius: '8px', border: '1px solid #dbeafe',
                                 fontSize: '0.82rem', fontWeight: 600, color: '#1d4ed8', background: '#fff',
                                 cursor: 'pointer',
                             }} />
 
-                        <button onClick={() => { setTargetDate(d => shiftDate(d, 1)); setSelectedPaciente(null); }} disabled={loading} style={{
+                        <button onClick={() => { setTargetDate(d => shiftDate(d, 1, isMensual)); setSelectedPaciente(null); }} disabled={loading} style={{
                             width: '36px', height: '36px', borderRadius: '8px', border: '1px solid #dbeafe',
                             background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center',
                             justifyContent: 'center', color: '#3b82f6', transition: 'all .15s',
                         }}><ArrowRight size={16} /></button>
 
-                        <button onClick={() => { setTargetDate(getOneYearAgoToday()); setSelectedPaciente(null); }} style={{
+                        <button onClick={() => { 
+                            const d = new Date(getOneYearAgoToday() + 'T00:00:00');
+                            if (isMensual) d.setDate(1);
+                            setTargetDate(d.toISOString().split('T')[0]);
+                            setSelectedPaciente(null); 
+                        }} style={{
                             padding: '6px 14px', borderRadius: '8px', border: 'none',
                             background: 'linear-gradient(135deg, #f59e0b, #d97706)',
                             color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
@@ -367,31 +392,74 @@ export default function ChequeoPanel({ addToast }) {
                     ))}
                 </div>
 
-                {/* Search bar */}
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px',
-                    padding: '0 14px', height: '42px',
-                }}>
-                    <Search size={16} color="#94a3b8" />
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Buscar por nombre, DNI o teléfono..."
+                {/* Filters Row */}
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                    {/* Search bar */}
+                    <div style={{
+                        flex: 1,
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px',
+                        padding: '0 14px', height: '42px',
+                    }}>
+                        <Search size={16} color="#94a3b8" />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Buscar por nombre, DNI o teléfono..."
+                            style={{
+                                flex: 1, border: 'none', outline: 'none', fontSize: '0.85rem',
+                                background: 'transparent', color: '#1e293b',
+                            }}
+                        />
+                        {search && (
+                            <button onClick={() => setSearch('')} style={{
+                                background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+                                color: '#94a3b8',
+                            }}>
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                    
+                    {/* Filtro Obra Social */}
+                    <select
+                        value={obraSocial}
+                        onChange={e => setObraSocial(e.target.value)}
                         style={{
-                            flex: 1, border: 'none', outline: 'none', fontSize: '0.85rem',
-                            background: 'transparent', color: '#1e293b',
+                            height: '42px', padding: '0 14px', borderRadius: '10px',
+                            border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer',
+                            fontSize: '0.85rem', color: '#1e293b', outline: 'none', maxWidth: '200px'
                         }}
-                    />
-                    {search && (
-                        <button onClick={() => setSearch('')} style={{
-                            background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
-                            color: '#94a3b8',
-                        }}>
-                            <X size={14} />
-                        </button>
-                    )}
+                    >
+                        <option value="">Todas las Obras Sociales</option>
+                        {obrasSocialesList.map(os => (
+                            <option key={os} value={os}>{os}</option>
+                        ))}
+                    </select>
+
+                    {/* Filtro Periodo */}
+                    <select
+                        value={isMensual ? 'mes' : 'dia'}
+                        onChange={e => {
+                            const mens = e.target.value === 'mes';
+                            setIsMensual(mens);
+                            if (mens) {
+                                // Asegurar que la fecha empieza en el 1er día si cambiamos a mensual
+                                const d = new Date(targetDate + 'T00:00:00');
+                                d.setDate(1);
+                                setTargetDate(d.toISOString().split('T')[0]);
+                            }
+                        }}
+                        style={{
+                            height: '42px', padding: '0 14px', borderRadius: '10px',
+                            border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer',
+                            fontSize: '0.85rem', color: '#1e293b', outline: 'none',
+                        }}
+                    >
+                        <option value="dia">Día Exacto</option>
+                        <option value="mes">Mes Entero</option>
+                    </select>
                 </div>
             </div>
 

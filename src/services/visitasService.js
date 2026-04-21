@@ -45,17 +45,30 @@ async function paginateQuery(buildQuery, onProgress = null) {
 /**
  * PASO 1: Busca DNIs de pacientes con visitas tipo CHQ en la fecha dada.
  * @param {string} fecha - Fecha en formato YYYY-MM-DD
+ * @param {boolean} isMensual - Si es true, busca por el mes (YYYY-MM)
+ * @param {string} obraSocial - Filtro opcional por obra social
  * @returns {Promise<string[]>} - Lista de DNIs únicos
  */
-async function fetchChequeosDNIs(fecha) {
-    const data = await paginateQuery((from, to) =>
-        supabase
+async function fetchChequeosDNIs(fecha, isMensual, obraSocial) {
+    const data = await paginateQuery((from, to) => {
+        let query = supabase
             .from('visitas_chequeo')
             .select('dni, paciente')
-            .eq('fecha', fecha)
             .ilike('tipo_visita', '%CHQ%')
-            .range(from, to)
-    );
+            .range(from, to);
+
+        if (isMensual) {
+            query = query.like('fecha', `${fecha.substring(0, 7)}%`);
+        } else {
+            query = query.eq('fecha', fecha);
+        }
+
+        if (obraSocial) {
+            query = query.ilike('obra_social', `%${obraSocial}%`);
+        }
+
+        return query;
+    });
 
     // Extraer DNIs únicos (usando paciente como fallback)
     const seen = new Set();
@@ -161,12 +174,12 @@ function agruparPorPaciente(data) {
  * Flujo principal: Obtiene pacientes con CHQ en la fecha indicada,
  * luego trae todo su historial.
  * 
- * @param {Object} options - { targetDate, search }
+ * @param {Object} options - { targetDate, search, isMensual, obraSocial }
  * @param {Function} onProgress - Callback (pages, rows) para UI
  * @returns {Promise<Array>} - Pacientes agrupados con todas sus visitas
  */
 export async function fetchPacientesChequeo(options = {}, onProgress = null) {
-    const { targetDate, search } = options;
+    const { targetDate, search, isMensual, obraSocial } = options;
 
     if (!targetDate) {
         return [];
@@ -174,7 +187,7 @@ export async function fetchPacientesChequeo(options = {}, onProgress = null) {
 
     // PASO 1: Encontrar DNIs con CHQ en la fecha objetivo
     if (onProgress) onProgress(0, 0, 'Buscando chequeos preventivos...');
-    const chequeoPatients = await fetchChequeosDNIs(targetDate);
+    const chequeoPatients = await fetchChequeosDNIs(targetDate, isMensual, obraSocial);
 
     if (!chequeoPatients.length) {
         return [];
@@ -219,6 +232,21 @@ export async function fetchEspecialidades() {
             .range(from, to)
     );
     const unique = [...new Set(all.map(d => d.especialidad).filter(Boolean))];
+    return unique.sort();
+}
+
+/**
+ * Obtiene valores únicos de obra social (lazy, paginado)
+ */
+export async function fetchObrasSociales() {
+    const all = await paginateQuery((from, to) =>
+        supabase
+            .from('visitas_chequeo')
+            .select('obra_social')
+            .not('obra_social', 'is', null)
+            .range(from, to)
+    );
+    const unique = [...new Set(all.map(d => d.obra_social).filter(Boolean))];
     return unique.sort();
 }
 
