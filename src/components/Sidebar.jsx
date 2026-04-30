@@ -2,11 +2,12 @@ import { useState } from 'react';
 import {
     Settings, PanelLeftClose, PanelLeft,
     ChevronDown, Home, MessageSquareText, MessageCircle,
-    Brain, HeartPulse,
+    Brain, HeartPulse, RefreshCw, BarChart3,
 } from 'lucide-react';
 
 export default function Sidebar({ collapsed, onToggle, activeView, onViewChange, unreadMessageCount = 0 }) {
     const [mensajeriaOpen, setMensajeriaOpen] = useState(false);
+    const [preventivaOpen, setPreventivaOpen] = useState(false);
 
     const mensajeriaSubItems = [
         { id: 'mensajeria', label: 'Chat Central', icon: MessageCircle },
@@ -14,6 +15,14 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
     ];
 
     const isMensajeriaActive = mensajeriaSubItems.some(i => activeView === i.id);
+
+    const preventivaSubItems = [
+        { id: 'chequeos', label: 'Chequeos', icon: HeartPulse },
+        { id: 'remarketing', label: 'Remarketing', icon: RefreshCw },
+        { id: 'metricas', label: 'Métricas', icon: BarChart3 },
+    ];
+
+    const isPreventivaActive = preventivaSubItems.some(i => activeView === i.id);
 
     function renderGroup({ label, icon: GroupIcon, isOpen, setOpen, isGroupActive, subItems, badge }) {
         if (collapsed) {
@@ -140,20 +149,14 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
                     ) : null,
                 })}
 
-                {(() => {
-                    const isActive = activeView === 'chequeos';
-                    return (
-                        <button
-                            className={`sidebar__item ${isActive ? 'sidebar__item--active' : ''}`}
-                            onClick={() => onViewChange('chequeos')}
-                            title={collapsed ? 'Chequeos' : undefined}
-                        >
-                            <HeartPulse size={20} className="sidebar__item-icon" />
-                            {!collapsed && <span className="sidebar__item-label">Chequeos</span>}
-                            {isActive && <div className="sidebar__item-indicator" />}
-                        </button>
-                    );
-                })()}
+                {renderGroup({
+                    label: 'Gestión Preventiva',
+                    icon: HeartPulse,
+                    isOpen: preventivaOpen,
+                    setOpen: setPreventivaOpen,
+                    isGroupActive: isPreventivaActive,
+                    subItems: preventivaSubItems,
+                })}
 
                 {!collapsed && (
                     <div style={{

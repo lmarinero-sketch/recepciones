@@ -40,6 +40,9 @@ export default function ChequeoPanel({ addToast }) {
     const [msgTarget, setMsgTarget] = useState(null);
     const [chatOpen, setChatOpen] = useState(false);
     const [chatPatient, setChatPatient] = useState(null);
+    // Schedule checkup
+    const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [scheduleDate, setScheduleDate] = useState('');
     // Bulk send
     const [bulkSelectionMode, setBulkSelectionMode] = useState(false);
     const [selectedForBulk, setSelectedForBulk] = useState([]);
@@ -52,8 +55,34 @@ export default function ChequeoPanel({ addToast }) {
     const [obraSocial, setObraSocial] = useState('');
     const [obrasSocialesList, setObrasSocialesList] = useState([]);
 
+    // Combobox state
+    const [osSearch, setOsSearch] = useState('');
+    const [osDropdownOpen, setOsDropdownOpen] = useState(false);
+    const osDropdownRef = useRef(null);
+    const osInputRef = useRef(null);
+
     useEffect(() => {
-        fetchObrasSociales().then(setObrasSocialesList).catch(console.error);
+        const handleClickOutside = (e) => {
+            if (osDropdownRef.current && !osDropdownRef.current.contains(e.target)) {
+                setOsDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const filteredOsList = useMemo(() => {
+        if (!osSearch) return obrasSocialesList;
+        const s = osSearch.toLowerCase();
+        return obrasSocialesList.filter(os => os.toLowerCase().includes(s));
+    }, [obrasSocialesList, osSearch]);
+
+    useEffect(() => {
+        fetchObrasSociales().then(list => {
+            // Filtrar solo las que empiezan con número
+            const valid = list.filter(os => /^\d/.test(os));
+            setObrasSocialesList(valid);
+        }).catch(console.error);
     }, []);
 
     const loadData = useCallback(async () => {
@@ -135,6 +164,32 @@ export default function ChequeoPanel({ addToast }) {
             addToast?.('Error al actualizar la asistencia', 'error');
         }
     };
+
+    // Agendar Chequeo Confirmado
+    const handleSaveSchedule = useCallback(() => {
+        if (!selectedPaciente || !scheduleDate) return;
+        
+        try {
+            const raw = localStorage.getItem('scheduled_checkups_v1');
+            const data = raw ? JSON.parse(raw) : {};
+            
+            data[selectedPaciente.dni] = {
+                dni: selectedPaciente.dni,
+                paciente: selectedPaciente.paciente,
+                telefono1: selectedPaciente.telefono1,
+                obra_social: selectedPaciente.obra_social,
+                fecha: scheduleDate,
+                estado: 'pendiente' // For remarketing funnel
+            };
+            
+            localStorage.setItem('scheduled_checkups_v1', JSON.stringify(data));
+            addToast?.(`Turno confirmado guardado para el ${formatDate(scheduleDate)}`, 'success');
+            setShowScheduleModal(false);
+            setScheduleDate('');
+        } catch (e) {
+            addToast?.('Error al guardar el turno', 'error');
+        }
+    }, [selectedPaciente, scheduleDate, addToast]);
 
     // Abrir modal masivo
     const handleBulkStart = useCallback(() => {
@@ -365,10 +420,9 @@ export default function ChequeoPanel({ addToast }) {
                 </div>
 
                 {/* Stats Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
                     {[
                         { label: 'Pacientes CHQ', value: stats.totalPacientes.toLocaleString(), icon: Users, color: '#3b82f6', bg: '#eff6ff' },
-                        { label: 'Visitas Históricas', value: stats.totalVisitas.toLocaleString(), icon: Activity, color: '#8b5cf6', bg: '#f5f3ff' },
                         { label: 'Con Teléfono', value: stats.conTelefono.toLocaleString(), icon: UserCheck, color: '#10b981', bg: '#ecfdf5' },
                         { label: 'Sin Teléfono', value: stats.sinTelefono.toLocaleString(), icon: AlertCircle, color: '#f59e0b', bg: '#fffbeb' },
                     ].map((stat, i) => (
@@ -423,20 +477,101 @@ export default function ChequeoPanel({ addToast }) {
                     </div>
                     
                     {/* Filtro Obra Social */}
-                    <select
-                        value={obraSocial}
-                        onChange={e => setObraSocial(e.target.value)}
-                        style={{
-                            height: '42px', padding: '0 14px', borderRadius: '10px',
-                            border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer',
-                            fontSize: '0.85rem', color: '#1e293b', outline: 'none', maxWidth: '200px'
-                        }}
-                    >
-                        <option value="">Todas las Obras Sociales</option>
-                        {obrasSocialesList.map(os => (
-                            <option key={os} value={os}>{os}</option>
-                        ))}
-                    </select>
+                    <div ref={osDropdownRef} style={{ position: 'relative', minWidth: '250px', maxWidth: '350px' }}>
+                        <div style={{
+                            display: 'flex', alignItems: 'center', height: '42px', padding: '0 14px',
+                            borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff',
+                            cursor: 'text'
+                        }} onClick={() => {
+                            setOsDropdownOpen(true);
+                            osInputRef.current?.focus();
+                        }}>
+                            <Building2 size={16} color="#94a3b8" style={{ marginRight: '8px', flexShrink: 0 }} />
+                            <input 
+                                ref={osInputRef}
+                                type="text"
+                                placeholder={obraSocial ? obraSocial : "Buscar Obra Social..."}
+                                value={osDropdownOpen ? osSearch : (obraSocial || '')}
+                                onChange={e => {
+                                    setOsSearch(e.target.value);
+                                    setOsDropdownOpen(true);
+                                }}
+                                onFocus={() => {
+                                    setOsSearch(''); // clear search to show all when focused
+                                    setOsDropdownOpen(true);
+                                }}
+                                style={{
+                                    border: 'none', outline: 'none', width: '100%',
+                                    fontSize: '0.85rem', color: '#1e293b', background: 'transparent'
+                                }}
+                            />
+                            {obraSocial && !osDropdownOpen && (
+                                <X size={14} color="#94a3b8" style={{ cursor: 'pointer', marginLeft: '8px', flexShrink: 0 }} onClick={(e) => {
+                                    e.stopPropagation();
+                                    setObraSocial('');
+                                    setOsSearch('');
+                                }} />
+                            )}
+                            <ChevronDown size={16} color="#94a3b8" style={{ marginLeft: '8px', cursor: 'pointer', flexShrink: 0 }} onClick={(e) => {
+                                e.stopPropagation();
+                                setOsDropdownOpen(!osDropdownOpen);
+                                osInputRef.current?.focus();
+                            }} />
+                        </div>
+
+                        {osDropdownOpen && (
+                            <div style={{
+                                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                                background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px',
+                                boxShadow: '0 10px 15px -3px rgba(0,0,0,.1)', zIndex: 50,
+                                maxHeight: '250px', overflowY: 'auto'
+                            }}>
+                                <div 
+                                    onClick={() => {
+                                        setObraSocial('');
+                                        setOsSearch('');
+                                        setOsDropdownOpen(false);
+                                    }}
+                                    style={{
+                                        padding: '10px 14px', fontSize: '0.85rem', color: '#64748b',
+                                        cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
+                                        background: obraSocial === '' ? '#f8fafc' : '#fff'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                                    onMouseLeave={e => e.currentTarget.style.background = obraSocial === '' ? '#f8fafc' : '#fff'}
+                                >
+                                    Todas las Obras Sociales
+                                </div>
+                                {filteredOsList.length === 0 ? (
+                                    <div style={{ padding: '10px 14px', fontSize: '0.85rem', color: '#94a3b8', textAlign: 'center' }}>
+                                        No se encontraron resultados
+                                    </div>
+                                ) : (
+                                    filteredOsList.map(os => (
+                                        <div 
+                                            key={os}
+                                            onClick={() => {
+                                                setObraSocial(os);
+                                                setOsSearch('');
+                                                setOsDropdownOpen(false);
+                                            }}
+                                            style={{
+                                                padding: '10px 14px', fontSize: '0.85rem', color: '#1e293b',
+                                                cursor: 'pointer',
+                                                background: obraSocial === os ? '#eff6ff' : '#fff',
+                                                color: obraSocial === os ? '#1d4ed8' : '#1e293b',
+                                                fontWeight: obraSocial === os ? 600 : 400
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
+                                            onMouseLeave={e => e.currentTarget.style.background = obraSocial === os ? '#eff6ff' : '#fff'}
+                                        >
+                                            {os}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     {/* Filtro Periodo */}
                     <select
@@ -758,6 +893,18 @@ export default function ChequeoPanel({ addToast }) {
                                     ) : (
                                         <><MessageSquare size={15} /> Enviar Recordatorio</>
                                     )}
+                                </button>
+                                <button
+                                    onClick={() => { setScheduleDate(''); setShowScheduleModal(true); }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                        padding: '8px 18px', borderRadius: '8px',
+                                        background: '#fff', border: '1px solid #e2e8f0',
+                                        cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700,
+                                        color: '#3b82f6', transition: 'all .2s',
+                                    }}
+                                >
+                                    <CalendarClock size={15} /> Agendar Turno
                                 </button>
                             </div>
                         </div>
@@ -1180,6 +1327,88 @@ export default function ChequeoPanel({ addToast }) {
                                 </div>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Schedule Checkup Modal */}
+            {showScheduleModal && selectedPaciente && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 1000, backdropFilter: 'blur(4px)',
+                }} onClick={() => setShowScheduleModal(false)}>
+                    <div className="animate-fade-in" onClick={e => e.stopPropagation()} style={{
+                        background: '#fff', borderRadius: '16px', width: '400px',
+                        boxShadow: '0 25px 50px rgba(0,0,0,.15)',
+                    }}>
+                        <div style={{
+                            padding: '20px 24px', borderBottom: '1px solid #f1f5f9',
+                            display: 'flex', alignItems: 'center', gap: '12px',
+                        }}>
+                            <div style={{
+                                width: '40px', height: '40px', borderRadius: '10px',
+                                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <CalendarClock size={20} color="#fff" />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>
+                                    Confirmar Turno
+                                </h3>
+                                <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b' }}>
+                                    {selectedPaciente.paciente}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div style={{ padding: '20px 24px' }}>
+                            <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '8px', display: 'block' }}>
+                                Fecha del Turno Confirmado
+                            </label>
+                            <input 
+                                type="date" 
+                                value={scheduleDate}
+                                onChange={(e) => setScheduleDate(e.target.value)}
+                                min={new Date().toISOString().split('T')[0]}
+                                style={{
+                                    width: '100%', padding: '10px 12px', borderRadius: '8px',
+                                    border: '1px solid #e2e8f0', fontSize: '0.9rem', outline: 'none',
+                                    color: '#1e293b'
+                                }}
+                            />
+                            <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '10px', lineHeight: 1.5 }}>
+                                Este paciente aparecerá en el panel de <strong>Remarketing</strong> para enviar recordatorios cuando se acerque la fecha de este turno.
+                            </p>
+                        </div>
+
+                        <div style={{
+                            padding: '16px 24px', borderTop: '1px solid #f1f5f9',
+                            display: 'flex', justifyContent: 'flex-end', gap: '10px',
+                        }}>
+                            <button onClick={() => setShowScheduleModal(false)} style={{
+                                padding: '8px 20px', borderRadius: '8px', border: '1px solid #e2e8f0',
+                                background: '#fff', cursor: 'pointer', fontSize: '0.82rem',
+                                color: '#64748b', fontWeight: 600,
+                            }}>
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSaveSchedule}
+                                disabled={!scheduleDate}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                    padding: '8px 24px', borderRadius: '8px', border: 'none',
+                                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                                    cursor: 'pointer', fontSize: '0.82rem',
+                                    color: '#fff', fontWeight: 700,
+                                    opacity: !scheduleDate ? 0.6 : 1,
+                                }}
+                            >
+                                Guardar Turno
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

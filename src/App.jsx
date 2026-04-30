@@ -13,6 +13,8 @@ import WhatsAppLineStatus from './components/WhatsAppLineStatus.jsx';
 import HomePanel from './components/HomePanel.jsx';
 import ChequeoPanel from './components/ChequeoPanel.jsx';
 import ConfigPanel from './components/ConfigPanel.jsx';
+import RemarketingPanel from './components/RemarketingPanel.jsx';
+import MetricasChequeoPanel from './components/MetricasChequeoPanel.jsx';
 import './App.css';
 
 function AppRoot() {
@@ -132,7 +134,7 @@ function App({ currentUser, onLogout }) {
                 <header className="topbar no-print" style={{ flexShrink: 0 }}>
                     <div className="topbar__left">
                         <h1 className="topbar__title"><span className="topbar__title-accent">Recepciones</span> Sanatorio Argentino</h1>
-                        <span className="topbar__subtitle">{activeView === 'chequeos' ? 'Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : 'Centro de Mensajería'}</span>
+                        <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'remarketing' ? 'Remarketing — Seguimiento' : activeView === 'metricas' ? 'Métricas de Chequeos' : 'Centro de Mensajería'}</span>
                     </div>
                     
                     {activeView === 'mensajeria' && (
@@ -213,6 +215,14 @@ function App({ currentUser, onLogout }) {
 
                 {activeView === 'chequeos' && (
                     <ChequeoPanel addToast={addToast} />
+                )}
+
+                {activeView === 'remarketing' && (
+                    <RemarketingPanel addToast={addToast} />
+                )}
+
+                {activeView === 'metricas' && (
+                    <MetricasChequeoPanel addToast={addToast} />
                 )}
 
                 {activeView === 'configuracion' && (

@@ -54,11 +54,17 @@ async function fetchChequeosDNIs(fecha, isMensual, obraSocial) {
         let query = supabase
             .from('visitas_chequeo')
             .select('dni, paciente')
-            .ilike('tipo_visita', '%CHQ%')
+            .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
             .range(from, to);
 
         if (isMensual) {
-            query = query.like('fecha', `${fecha.substring(0, 7)}%`);
+            const yearMonth = fecha.substring(0, 7); // YYYY-MM
+            const firstDay = `${yearMonth}-01`;
+            const d = new Date(firstDay + 'T00:00:00');
+            d.setMonth(d.getMonth() + 1);
+            const nextMonthFirstDay = d.toISOString().split('T')[0];
+
+            query = query.gte('fecha', firstDay).lt('fecha', nextMonthFirstDay);
         } else {
             query = query.eq('fecha', fecha);
         }
@@ -220,49 +226,52 @@ export async function fetchPacientesChequeo(options = {}, onProgress = null) {
     return pacientes;
 }
 
-/**
- * Obtiene valores únicos de especialidad (lazy, paginado)
- */
 export async function fetchEspecialidades() {
-    const all = await paginateQuery((from, to) =>
-        supabase
-            .from('visitas_chequeo')
-            .select('especialidad')
-            .not('especialidad', 'is', null)
-            .range(from, to)
-    );
-    const unique = [...new Set(all.map(d => d.especialidad).filter(Boolean))];
-    return unique.sort();
+    // Intentar traer los datos más recientes para no descargar millones de registros
+    const { data } = await supabase
+        .from('visitas_chequeo')
+        .select('especialidad')
+        .not('especialidad', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(10000);
+    
+    if (data) {
+        const unique = [...new Set(data.map(d => d.especialidad).filter(Boolean))];
+        return unique.sort();
+    }
+    return [];
 }
 
-/**
- * Obtiene valores únicos de obra social (lazy, paginado)
- */
 export async function fetchObrasSociales() {
-    const all = await paginateQuery((from, to) =>
-        supabase
-            .from('visitas_chequeo')
-            .select('obra_social')
-            .not('obra_social', 'is', null)
-            .range(from, to)
-    );
-    const unique = [...new Set(all.map(d => d.obra_social).filter(Boolean))];
-    return unique.sort();
+    // Evitamos descargar toda la base usando limit.
+    // Lo ideal en el futuro es crear una RPC en Supabase: supabase.rpc('get_obras_sociales')
+    const { data } = await supabase
+        .from('visitas_chequeo')
+        .select('obra_social')
+        .not('obra_social', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(20000); // Traemos los últimos 20k registros para sacar obras sociales recientes
+        
+    if (data) {
+        const unique = [...new Set(data.map(d => d.obra_social).filter(Boolean))];
+        return unique.sort();
+    }
+    return [];
 }
 
-/**
- * Obtiene valores únicos de centro (lazy, paginado)
- */
 export async function fetchCentros() {
-    const all = await paginateQuery((from, to) =>
-        supabase
-            .from('visitas_chequeo')
-            .select('centro')
-            .not('centro', 'is', null)
-            .range(from, to)
-    );
-    const unique = [...new Set(all.map(d => d.centro).filter(Boolean))];
-    return unique.sort();
+    const { data } = await supabase
+        .from('visitas_chequeo')
+        .select('centro')
+        .not('centro', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(10000);
+        
+    if (data) {
+        const unique = [...new Set(data.map(d => d.centro).filter(Boolean))];
+        return unique.sort();
+    }
+    return [];
 }
 
 /**
@@ -279,4 +288,81 @@ export async function updateAsistencia(id, asistencia) {
         throw error;
     }
     return true;
+}
+
+/**
+ * Fetch all CHQ visits for metrics aggregation (minimal fields).
+ * Returns raw records for client-side aggregation.
+ */
+export async function fetchChequeoMetrics(onProgress = null) {
+    if (onProgress) onProgress('Cargando datos de chequeos...');
+
+    const data = await paginateQuery((from, to) => {
+        return supabase
+            .from('visitas_chequeo')
+            .select('fecha, dni, obra_social, centro, asistencia')
+            .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
+            .not('fecha', 'is', null)
+            .range(from, to);
+    }, (pages, rows) => {
+        if (onProgress) onProgress(`Cargando... ${rows.toLocaleString()} registros`);
+    });
+
+    return data;
+}
+
+/**
+ * Fetch candidates for marketing outreach.
+ * Returns patients grouped by DNI with their last CHQ date and months since.
+ */
+export async function fetchMarketingCandidates(onProgress = null) {
+    if (onProgress) onProgress('Analizando pacientes...');
+
+    const data = await paginateQuery((from, to) => {
+        return supabase
+            .from('visitas_chequeo')
+            .select('fecha, dni, paciente, telefono1_paciente, telefono2_paciente, obra_social, departamento, centro')
+            .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
+            .not('fecha', 'is', null)
+            .not('dni', 'is', null)
+            .range(from, to);
+    }, (pages, rows) => {
+        if (onProgress) onProgress(`Cargando... ${rows.toLocaleString()} registros`);
+    });
+
+    // Group by DNI, find last CHQ date
+    const byDNI = {};
+    data.forEach(v => {
+        if (!v.dni) return;
+        if (!byDNI[v.dni]) {
+            byDNI[v.dni] = {
+                dni: v.dni,
+                paciente: v.paciente,
+                telefono1: v.telefono1_paciente,
+                telefono2: v.telefono2_paciente,
+                obra_social: v.obra_social,
+                departamento: v.departamento,
+                centro: v.centro,
+                ultima_chq: v.fecha,
+                total_chq: 0,
+            };
+        }
+        byDNI[v.dni].total_chq++;
+        if (!byDNI[v.dni].telefono1 && v.telefono1_paciente) {
+            byDNI[v.dni].telefono1 = v.telefono1_paciente;
+        }
+        if (v.fecha > byDNI[v.dni].ultima_chq) {
+            byDNI[v.dni].ultima_chq = v.fecha;
+        }
+    });
+
+    const now = new Date();
+    const candidates = Object.values(byDNI).map(p => {
+        const lastDate = new Date(p.ultima_chq + 'T00:00:00');
+        const monthsSince = (now.getFullYear() - lastDate.getFullYear()) * 12 + (now.getMonth() - lastDate.getMonth());
+        return { ...p, meses_desde_ultima: monthsSince };
+    });
+
+    candidates.sort((a, b) => b.meses_desde_ultima - a.meses_desde_ultima);
+    return candidates;
 }

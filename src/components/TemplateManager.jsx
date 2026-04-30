@@ -26,8 +26,12 @@ const AVAILABLE_VARIABLES = [
     { key: '{tratamiento}', label: 'Tratamiento', icon: '💊', color: '#8B5CF6', group: 'Clínico' },
     { key: '{medico}', label: 'Médico Solicitante', icon: '🩺', color: '#14B8A6', group: 'Clínico' },
     { key: '{fecha_cirugia}', label: 'Fecha de Cirugía', icon: '📅', color: '#F59E0B', group: 'Fechas' },
+    { key: '{fecha_turno}', label: 'Fecha del Turno', icon: '📅', color: '#F59E0B', group: 'Fechas' },
+    { key: '{hora_turno}', label: 'Hora del Turno', icon: '⏰', color: '#F59E0B', group: 'Fechas' },
     { key: '{fecha_hoy}', label: 'Fecha de Hoy', icon: '🗓️', color: '#F59E0B', group: 'Fechas' },
     { key: '{presupuesto_total}', label: 'Presupuesto Total', icon: '💰', color: '#22C55E', group: 'Presupuesto' },
+    { key: '{valor_chequeo}', label: 'Valor del Chequeo', icon: '💵', color: '#22C55E', group: 'Presupuesto' },
+    { key: '{sede}', label: 'Sede de Atención', icon: '🏥', color: '#6366F1', group: 'General' },
 ];
 
 // Datos de ejemplo para el preview
@@ -39,8 +43,12 @@ const PREVIEW_DATA = {
     '{tratamiento}': 'CESAREA',
     '{medico}': 'Dr. Juan Pérez',
     '{fecha_cirugia}': '15/03/2026',
+    '{fecha_turno}': '25/04/2026',
+    '{hora_turno}': '08:00hs',
     '{fecha_hoy}': new Date().toLocaleDateString('es-AR'),
     '{presupuesto_total}': '$350.000',
+    '{valor_chequeo}': '$270.000',
+    '{sede}': 'Santa Fe',
 };
 
 // Categorías predefinidas
