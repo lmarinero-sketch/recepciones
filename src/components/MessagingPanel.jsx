@@ -311,17 +311,6 @@ export default function MessagingPanel({ addToast }) {
         });
     }, []);
 
-    // Global keyboard listener for Meta cost modal (Enter/Escape)
-    useEffect(() => {
-        if (!showMetaCostModal) return;
-        const handleGlobalKey = (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); confirmSendMetaTemplate(); }
-            if (e.key === 'Escape') { e.preventDefault(); setShowMetaCostModal(false); setPendingMetaTemplate(null); }
-        };
-        window.addEventListener('keydown', handleGlobalKey);
-        return () => window.removeEventListener('keydown', handleGlobalKey);
-    }, [showMetaCostModal, confirmSendMetaTemplate]);
-
     // === Load WhatsApp lines (solo line_recepciones) ===
     useEffect(() => {
         // Recepciones siempre usa su propia línea, no necesita cargar las de ADM-QUI
@@ -654,6 +643,17 @@ export default function MessagingPanel({ addToast }) {
             inputRef.current?.focus();
         }
     }, [pendingMetaTemplate, selectedPhone, sendingMetaTemplate, addToast]);
+
+    // Global keyboard listener for Meta cost modal (Enter/Escape)
+    useEffect(() => {
+        if (!showMetaCostModal) return;
+        const handleGlobalKey = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); confirmSendMetaTemplate(); }
+            if (e.key === 'Escape') { e.preventDefault(); setShowMetaCostModal(false); setPendingMetaTemplate(null); }
+        };
+        window.addEventListener('keydown', handleGlobalKey);
+        return () => window.removeEventListener('keydown', handleGlobalKey);
+    }, [showMetaCostModal, confirmSendMetaTemplate]);
 
     // ==========================================
     // NEW CONVERSATION
