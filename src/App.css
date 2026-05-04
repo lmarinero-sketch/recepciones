@@ -2666,6 +2666,31 @@
     background: #F1F5F9;
 }
 
+/* Meta WhatsApp Template items (amarillo — tienen costo) */
+.msg-panel__shortcut-item--meta {
+    background: #FFFBEB;
+    border-left: 3px solid #F59E0B;
+}
+
+.msg-panel__shortcut-item--meta:hover,
+.msg-panel__shortcut-item--active.msg-panel__shortcut-item--meta {
+    background: #FEF3C7 !important;
+}
+
+.msg-panel__shortcut-name--meta {
+    color: #B45309 !important;
+}
+
+.msg-panel__shortcut-cat--meta {
+    background: linear-gradient(135deg, #F59E0B, #D97706) !important;
+    color: #fff !important;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.6rem;
+    letter-spacing: 0.03em;
+}
+
 /* Lightbox */
 .msg-panel__lightbox {
     position: fixed;

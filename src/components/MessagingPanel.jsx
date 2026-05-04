@@ -21,6 +21,7 @@ import {
 import { sendWhatsAppMessage, normalizeArgentinePhone } from '../services/builderbotApi';
 import { searchPatients } from '../services/patientService';
 import { fetchShortcuts } from '../services/shortcutService';
+import { fetchMetaTemplates, sendMetaTemplate } from '../services/metaTemplateService';
 import { supabase } from '../lib/supabase';
 import ShortcutManager from './ShortcutManager';
 
@@ -63,6 +64,11 @@ export default function MessagingPanel({ addToast }) {
     const [shortcutFilter, setShortcutFilter] = useState('');
     const [shortcutIndex, setShortcutIndex] = useState(0);
     const [showShortcutManager, setShowShortcutManager] = useState(false);
+    // Meta WhatsApp Templates (oficiales con costo)
+    const [metaTemplates, setMetaTemplates] = useState([]);
+    const [showMetaCostModal, setShowMetaCostModal] = useState(false);
+    const [pendingMetaTemplate, setPendingMetaTemplate] = useState(null);
+    const [sendingMetaTemplate, setSendingMetaTemplate] = useState(false);
     // Patient context (surgery + budget)
     const [patientContext, setPatientContext] = useState(null);
     const [showBudgetDetail, setShowBudgetDetail] = useState(false);
@@ -292,12 +298,29 @@ export default function MessagingPanel({ addToast }) {
         return unsub;
     }, [selectedPhone]);
 
-    // === LOAD SHORTCUTS ===
+    // === LOAD SHORTCUTS + META TEMPLATES ===
     useEffect(() => {
         fetchShortcuts(true).then(setShortcuts).catch(err => {
             console.warn('Could not load shortcuts:', err);
         });
+        fetchMetaTemplates().then(templates => {
+            setMetaTemplates(templates);
+            console.log(`[MessagingPanel] ${templates.length} Meta templates cargadas`);
+        }).catch(err => {
+            console.warn('Could not load Meta templates:', err);
+        });
     }, []);
+
+    // Global keyboard listener for Meta cost modal (Enter/Escape)
+    useEffect(() => {
+        if (!showMetaCostModal) return;
+        const handleGlobalKey = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); confirmSendMetaTemplate(); }
+            if (e.key === 'Escape') { e.preventDefault(); setShowMetaCostModal(false); setPendingMetaTemplate(null); }
+        };
+        window.addEventListener('keydown', handleGlobalKey);
+        return () => window.removeEventListener('keydown', handleGlobalKey);
+    }, [showMetaCostModal, confirmSendMetaTemplate]);
 
     // === Load WhatsApp lines (solo line_recepciones) ===
     useEffect(() => {
@@ -509,7 +532,18 @@ export default function MessagingPanel({ addToast }) {
     // ==========================================
     // SHORTCUTS / TEMPLATES
     // ==========================================
-    const filteredShortcuts = shortcuts.filter(s => {
+    // Combinar shortcuts locales + Meta templates en una sola lista
+    const metaAsShortcuts = metaTemplates.map(t => ({
+        id: `meta_${t.name || t.id}`,
+        shortcut: t.name || t.templateName || 'template',
+        label: t.name || t.templateName || 'Template',
+        message: t.body || t.text || t.components?.find(c => c.type === 'BODY')?.text || `[Plantilla: ${t.name}]`,
+        category: 'WhatsApp Meta',
+        _isMeta: true,
+        _metaData: t,
+    }));
+    const allShortcuts = [...shortcuts, ...metaAsShortcuts];
+    const filteredShortcuts = allShortcuts.filter(s => {
         if (!shortcutFilter) return true;
         const q = shortcutFilter.toLowerCase();
         return s.shortcut.toLowerCase().includes(q) ||
@@ -572,6 +606,15 @@ export default function MessagingPanel({ addToast }) {
     }, [patientContext]);
 
     const selectShortcut = useCallback((shortcut) => {
+        // Si es plantilla Meta → mostrar modal de confirmación de costo
+        if (shortcut._isMeta) {
+            setPendingMetaTemplate(shortcut);
+            setShowMetaCostModal(true);
+            setShowShortcuts(false);
+            setShortcutFilter('');
+            setShortcutIndex(0);
+            return;
+        }
         const contactName = selectedPhone ? (contactNames[selectedPhone] || '') : '';
         const personalized = personalizeMessage(shortcut.message, contactName);
         setMessageText(personalized);
@@ -580,6 +623,37 @@ export default function MessagingPanel({ addToast }) {
         setShortcutIndex(0);
         inputRef.current?.focus();
     }, [selectedPhone, contactNames, personalizeMessage]);
+
+    // Confirmar y enviar Meta Template
+    const confirmSendMetaTemplate = useCallback(async () => {
+        if (!pendingMetaTemplate || !selectedPhone || sendingMetaTemplate) return;
+        setSendingMetaTemplate(true);
+        try {
+            const normalized = normalizeArgentinePhone(selectedPhone);
+            const templateName = pendingMetaTemplate._metaData?.name || pendingMetaTemplate.shortcut;
+            const lang = pendingMetaTemplate._metaData?.language || 'es';
+            await sendMetaTemplate({
+                to: normalized,
+                templateName,
+                languageCode: lang,
+            });
+            // Guardar como mensaje saliente en la BD para que aparezca en el chat
+            await saveOutgoingMessage({
+                phone: selectedPhone,
+                content: `📋 [Plantilla Meta] ${templateName}: ${pendingMetaTemplate.message}`,
+                lineId: 'line_recepciones',
+            });
+            addToast?.(`Plantilla "${templateName}" enviada`, 'success');
+        } catch (err) {
+            console.error('Error sending Meta template:', err);
+            addToast?.(`Error enviando plantilla: ${err.message}`, 'error');
+        } finally {
+            setSendingMetaTemplate(false);
+            setShowMetaCostModal(false);
+            setPendingMetaTemplate(null);
+            inputRef.current?.focus();
+        }
+    }, [pendingMetaTemplate, selectedPhone, sendingMetaTemplate, addToast]);
 
     // ==========================================
     // NEW CONVERSATION
@@ -627,6 +701,12 @@ export default function MessagingPanel({ addToast }) {
 
     // === KEY HANDLER ===
     const handleKeyDown = (e) => {
+        // Meta cost modal — Enter para aceptar, Escape para cancelar
+        if (showMetaCostModal) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmSendMetaTemplate(); return; }
+            if (e.key === 'Escape') { e.preventDefault(); setShowMetaCostModal(false); setPendingMetaTemplate(null); return; }
+            return;
+        }
         if (showShortcuts && filteredShortcuts.length > 0) {
             if (e.key === 'ArrowDown') { e.preventDefault(); setShortcutIndex(prev => (prev + 1) % filteredShortcuts.length); return; }
             if (e.key === 'ArrowUp') { e.preventDefault(); setShortcutIndex(prev => (prev - 1 + filteredShortcuts.length) % filteredShortcuts.length); return; }
@@ -1069,13 +1149,17 @@ export default function MessagingPanel({ addToast }) {
                                         {filteredShortcuts.map((s, i) => (
                                             <button
                                                 key={s.id || i}
-                                                className={`msg-panel__shortcut-item ${i === shortcutIndex ? 'msg-panel__shortcut-item--active' : ''}`}
+                                                className={`msg-panel__shortcut-item ${i === shortcutIndex ? 'msg-panel__shortcut-item--active' : ''} ${s._isMeta ? 'msg-panel__shortcut-item--meta' : ''}`}
                                                 onClick={() => selectShortcut(s)}
                                                 onMouseEnter={() => setShortcutIndex(i)}
                                             >
-                                                <span className="msg-panel__shortcut-name">/{s.shortcut}</span>
+                                                {s._isMeta && <DollarSign size={12} style={{ color: '#B45309', flexShrink: 0 }} />}
+                                                <span className={`msg-panel__shortcut-name ${s._isMeta ? 'msg-panel__shortcut-name--meta' : ''}`}>/{s.shortcut}</span>
                                                 <span className="msg-panel__shortcut-label">{s.label}</span>
-                                                {s.category && <span className="msg-panel__shortcut-cat">{s.category}</span>}
+                                                {s._isMeta
+                                                    ? <span className="msg-panel__shortcut-cat msg-panel__shortcut-cat--meta">Meta API</span>
+                                                    : s.category && <span className="msg-panel__shortcut-cat">{s.category}</span>
+                                                }
                                             </button>
                                         ))}
                                     </div>
@@ -1149,6 +1233,97 @@ export default function MessagingPanel({ addToast }) {
                 <div className="msg-panel__lightbox" onClick={() => setLightboxUrl(null)}>
                     <button className="msg-panel__lightbox-close"><X size={24} /></button>
                     <img src={lightboxUrl} alt="Vista ampliada" className="msg-panel__lightbox-img" />
+                </div>
+            )}
+
+            {/* ========== META TEMPLATE COST MODAL ========== */}
+            {showMetaCostModal && pendingMetaTemplate && (
+                <div style={{
+                    position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10030,
+                    background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }} onClick={() => { setShowMetaCostModal(false); setPendingMetaTemplate(null); }}>
+                    <div style={{
+                        background: '#FFFBEB', borderRadius: '16px', padding: '28px 32px',
+                        maxWidth: '420px', width: '90%', boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+                        border: '2px solid #F59E0B', position: 'relative',
+                    }} onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                            <div style={{
+                                width: '40px', height: '40px', borderRadius: '12px',
+                                background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <DollarSign size={20} color="white" />
+                            </div>
+                            <div>
+                                <div style={{ fontWeight: 700, fontSize: '1rem', color: '#92400E' }}>Plantilla Oficial Meta</div>
+                                <div style={{ fontSize: '0.75rem', color: '#B45309' }}>WhatsApp Business API</div>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div style={{
+                            background: '#FEF3C7', borderRadius: '10px', padding: '14px',
+                            marginBottom: '16px', border: '1px solid #FDE68A',
+                        }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#92400E', marginBottom: '6px' }}>
+                                📋 {pendingMetaTemplate.shortcut}
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: '#78350F', lineHeight: '1.4', maxHeight: '100px', overflowY: 'auto' }}>
+                                {pendingMetaTemplate.message}
+                            </div>
+                        </div>
+
+                        {/* Warning */}
+                        <div style={{
+                            background: '#FEE2E2', borderRadius: '8px', padding: '10px 14px',
+                            marginBottom: '20px', border: '1px solid #FECACA',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                        }}>
+                            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                            <span style={{ fontSize: '0.78rem', color: '#991B1B', fontWeight: 500 }}>
+                                Este mensaje tiene costo asociado por conversación iniciada vía Meta WhatsApp Business API.
+                            </span>
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => { setShowMetaCostModal(false); setPendingMetaTemplate(null); }}
+                                style={{
+                                    padding: '8px 18px', borderRadius: '8px', border: '1px solid #D1D5DB',
+                                    background: 'white', color: '#374151', fontWeight: 500, fontSize: '0.82rem',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmSendMetaTemplate}
+                                disabled={sendingMetaTemplate}
+                                style={{
+                                    padding: '8px 22px', borderRadius: '8px', border: 'none',
+                                    background: sendingMetaTemplate ? '#9CA3AF' : 'linear-gradient(135deg, #F59E0B, #D97706)',
+                                    color: 'white', fontWeight: 600, fontSize: '0.82rem',
+                                    cursor: sendingMetaTemplate ? 'not-allowed' : 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                    boxShadow: '0 2px 8px rgba(245,158,11,0.3)',
+                                }}
+                            >
+                                {sendingMetaTemplate ? <Loader size={14} className="animate-spin" /> : <Send size={14} />}
+                                {sendingMetaTemplate ? 'Enviando...' : 'Enviar plantilla'}
+                            </button>
+                        </div>
+
+                        {/* Keyboard hint */}
+                        <div style={{
+                            marginTop: '12px', textAlign: 'center', fontSize: '0.68rem', color: '#9CA3AF',
+                        }}>
+                            Presiona <kbd style={{ padding: '1px 6px', borderRadius: '4px', border: '1px solid #D1D5DB', background: '#F3F4F6', fontFamily: 'monospace', fontWeight: 600 }}>Enter</kbd> para enviar · <kbd style={{ padding: '1px 6px', borderRadius: '4px', border: '1px solid #D1D5DB', background: '#F3F4F6', fontFamily: 'monospace', fontWeight: 600 }}>Esc</kbd> para cancelar
+                        </div>
+                    </div>
                 </div>
             )}
 
