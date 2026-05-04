@@ -299,19 +299,19 @@ export default function MessagingPanel({ addToast }) {
         });
     }, []);
 
-    // === Load WhatsApp lines ===
+    // === Load WhatsApp lines (solo line_recepciones) ===
     useEffect(() => {
-        fetchWhatsAppLines().then(setWhatsappLines).catch(console.error);
+        // Recepciones siempre usa su propia línea, no necesita cargar las de ADM-QUI
+        setWhatsappLines([]);
+        setAssignedLineId('line_recepciones');
     }, []);
 
-    // === Load assigned line for selected conversation ===
+    // === Assigned line is always line_recepciones ===
     useEffect(() => {
-        if (!selectedPhone) { setAssignedLineId(null); return; }
-        getAssignedLine(selectedPhone).then(lineId => {
-            setAssignedLineId(lineId);
-            if (!lineId) setShowLineSelector(true);
-            else setShowLineSelector(false);
-        }).catch(console.error);
+        if (!selectedPhone) return;
+        // Siempre usar line_recepciones — sistema aislado
+        setAssignedLineId('line_recepciones');
+        setShowLineSelector(false);
     }, [selectedPhone]);
 
     // Get current line info

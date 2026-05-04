@@ -11,10 +11,11 @@ import { normalizeArgentinePhone } from './builderbotApi';
  * Retorna: [{ phone, lastMessage, lastDate, unreadCount, senderName, direction }]
  */
 export async function fetchConversations() {
-    // Get all messages ordered by created_at DESC
+    // Get messages ONLY from line_recepciones (aislado de ADM-QUI)
     const { data, error } = await supabase
         .from('whatsapp_messages')
         .select('phone, content, direction, sender_name, is_read, created_at, media_type, line_id')
+        .eq('line_id', 'line_recepciones')
         .order('created_at', { ascending: false })
         .limit(10000);
 
@@ -70,6 +71,7 @@ export async function fetchMessages(phone) {
         .from('whatsapp_messages')
         .select('*')
         .eq('phone', normalized)
+        .eq('line_id', 'line_recepciones')
         .order('created_at', { ascending: true });
 
     if (error) {
@@ -91,7 +93,8 @@ export async function markAsRead(phone) {
         .update({ is_read: true })
         .eq('phone', normalized)
         .eq('direction', 'incoming')
-        .eq('is_read', false);
+        .eq('is_read', false)
+        .eq('line_id', 'line_recepciones');
 
     if (error) {
         console.error('Error marking messages as read:', error);
@@ -106,7 +109,8 @@ export async function markAllAsRead() {
         .from('whatsapp_messages')
         .update({ is_read: true })
         .eq('direction', 'incoming')
-        .eq('is_read', false);
+        .eq('is_read', false)
+        .eq('line_id', 'line_recepciones');
 
     if (error) {
         console.error('Error marking all messages as read:', error);
@@ -129,6 +133,7 @@ export async function fetchUnreadCounts() {
         .select('phone')
         .eq('direction', 'incoming')
         .eq('is_read', false)
+        .eq('line_id', 'line_recepciones')
         .limit(5000);
 
     if (error) {
@@ -161,9 +166,9 @@ export async function saveOutgoingMessage({ phone, content, mediaUrl, mediaType,
             content: content || '',
             media_url: mediaUrl || null,
             media_type: mediaType || 'text',
-            sender_name: 'Sistema ADM-QUI',
+            sender_name: 'Recepciones',
             is_read: true,
-            line_id: lineId || null,
+            line_id: lineId || 'line_recepciones',
         })
         .select()
         .single();
@@ -238,10 +243,13 @@ export function subscribeToAllIncoming(callback) {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'whatsapp_messages',
-                filter: 'direction=eq.incoming',
+                filter: 'line_id=eq.line_recepciones',
             },
             (payload) => {
-                callback(payload.new);
+                // Solo procesar incoming (los outgoing ya se manejan optimisticamente)
+                if (payload.new.direction === 'incoming') {
+                    callback(payload.new);
+                }
             }
         )
         .subscribe();
