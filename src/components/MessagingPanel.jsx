@@ -902,31 +902,7 @@ export default function MessagingPanel({ addToast }) {
                                                 </>
                                             )}
                                         </div>
-                                        {/* Líneas usadas con este paciente */}
-                                        {conv.usedLines && conv.usedLines.length > 0 && (
-                                            <div className="msg-panel__conv-lines">
-                                                {conv.usedLines.map(lid => {
-                                                    const line = whatsappLines.find(l => l.id === lid);
-                                                    return (
-                                                        <span
-                                                            key={lid}
-                                                            className="msg-panel__conv-line-tag"
-                                                            style={{
-                                                                background: `${line?.color || '#94A3B8'}18`,
-                                                                color: line?.color || '#94A3B8',
-                                                                borderColor: `${line?.color || '#94A3B8'}30`,
-                                                            }}
-                                                        >
-                                                            <span
-                                                                className="msg-panel__conv-line-dot"
-                                                                style={{ background: line?.color || '#94A3B8' }}
-                                                            />
-                                                            {line?.label?.replace('WhatsApp ', '') || lid}
-                                                        </span>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
+                                        {/* Líneas multi-línea ocultas — sistema unificado */}
                                     </div>
                                 </button>
                             );
@@ -963,34 +939,7 @@ export default function MessagingPanel({ addToast }) {
                                     <span className="msg-panel__chat-header-name">{selectedContactName}</span>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <span className="msg-panel__chat-header-phone"><Phone size={11} /> {selectedPhone}</span>
-                                        {currentLine ? (
-                                            <span
-                                                onClick={() => setShowChangeLineModal(true)}
-                                                style={{
-                                                    display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                                    padding: '1px 8px', borderRadius: '10px',
-                                                    background: `${currentLine.color}30`, fontSize: '0.65rem',
-                                                    cursor: 'pointer', transition: 'all 0.15s', fontWeight: 600,
-                                                    color: currentLine.color === '#0088CC' ? '#0077B6' : '#128C7E',
-                                                }}
-                                                title="Cambiar línea"
-                                            >
-                                                <span style={{
-                                                    width: '5px', height: '5px', borderRadius: '50%',
-                                                    background: currentLine.color, display: 'inline-block',
-                                                }} />
-                                                {currentLine.label} ···{currentLine.phone.slice(-4)}
-                                            </span>
-                                        ) : (
-                                            <span style={{
-                                                display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                                padding: '1px 8px', borderRadius: '10px',
-                                                background: 'rgba(234,179,8,0.2)', fontSize: '0.65rem',
-                                                color: '#B45309',
-                                            }}>
-                                                ⚠️ Sin línea
-                                            </span>
-                                        )}
+                                        {/* Badge de línea oculto — sistema unificado */}
                                     </div>
                                 </div>
                                 {/* Quick info badges */}
@@ -1211,8 +1160,8 @@ export default function MessagingPanel({ addToast }) {
                 />
             )}
 
-            {/* ===== LINE SELECTOR MODAL ===== */}
-            {showLineSelector && selectedPhone && whatsappLines.length > 0 && (
+            {/* ===== LINE SELECTOR MODAL (oculto — sistema unificado) ===== */}
+            {false && showLineSelector && selectedPhone && whatsappLines.length > 0 && (
                 <div style={{
                     position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10020,
                     background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)',
@@ -1290,8 +1239,8 @@ export default function MessagingPanel({ addToast }) {
                 </div>
             )}
 
-            {/* ===== CHANGE LINE MODAL ===== */}
-            {showChangeLineModal && whatsappLines.length > 0 && (
+            {/* ===== CHANGE LINE MODAL (oculto — sistema unificado) ===== */}
+            {false && showChangeLineModal && whatsappLines.length > 0 && (
                 <div style={{
                     position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10020,
                     background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)',

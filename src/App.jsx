@@ -137,9 +137,7 @@ function App({ currentUser, onLogout }) {
                         <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'remarketing' ? 'Remarketing — Seguimiento' : activeView === 'metricas' ? 'Métricas de Chequeos' : 'Centro de Mensajería'}</span>
                     </div>
                     
-                    {activeView === 'mensajeria' && (
-                        <WhatsAppLineStatus />
-                    )}
+                    {/* WhatsAppLineStatus removido — sistema unificado a una sola cuenta BuilderBot */}
                     
                     <div className="topbar__right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <span className="topbar__date">
