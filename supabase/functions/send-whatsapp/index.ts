@@ -28,7 +28,6 @@ async function getBuilderBotConfig(lineId?: string) {
             .from('whatsapp_lines')
             .select('api_key, project_id')
             .eq('id', lineId)
-            .eq('is_active', true)
             .single();
 
         if (!lineError && line?.api_key && line?.project_id
