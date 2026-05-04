@@ -1,6 +1,7 @@
 // Supabase Edge Function: send-whatsapp
 // Proxy server-side para BuilderBot API (evita CORS)
 // Soporta múltiples líneas WhatsApp: lee credenciales desde whatsapp_lines
+// Soporta acciones: enviar mensaje, listar templates, enviar template
 // Fallback a app_config para retrocompatibilidad
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -43,23 +44,21 @@ async function getBuilderBotConfig(lineId?: string) {
     }
 
     // Fallback: leer de app_config (retrocompatibilidad)
-    const { data, error } = await supabase
+    const supabase2 = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const { data: configs, error: configError } = await supabase2
         .from('app_config')
         .select('key, value')
         .in('key', ['builderbot_api_key', 'builderbot_project_id']);
 
-    if (error) throw new Error('Error leyendo config: ' + error.message);
+    if (configError || !configs) {
+        throw new Error('No se encontraron credenciales de BuilderBot');
+    }
 
-    const configMap: Record<string, string> = {};
-    (data || []).forEach((row: { key: string; value: string }) => {
-        configMap[row.key] = row.value;
-    });
-
-    const apiKey = configMap['builderbot_api_key'];
-    const projectId = configMap['builderbot_project_id'];
+    const apiKey = configs.find((c: any) => c.key === 'builderbot_api_key')?.value;
+    const projectId = configs.find((c: any) => c.key === 'builderbot_project_id')?.value;
 
     if (!apiKey || !projectId) {
-        throw new Error('Faltan credenciales de BuilderBot');
+        throw new Error('Credenciales de BuilderBot incompletas en app_config');
     }
 
     cachedConfigs[cacheKey] = { apiKey, projectId, cachedAt: Date.now() };
@@ -80,7 +79,71 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const { content, number, mediaUrl, lineId } = await req.json();
+        const payload = await req.json();
+        const { action, lineId } = payload;
+
+        // =============================================
+        // ACTION: list_templates — Listar plantillas Meta WhatsApp
+        // =============================================
+        if (action === 'list_templates') {
+            const config = await getBuilderBotConfig(lineId || 'line_recepciones');
+            const url = `https://app.builderbot.cloud/api/v2/${config.projectId}/whatsapp-template?limit=50`;
+
+            console.log(`[send-whatsapp] Listando templates para línea: ${lineId || 'line_recepciones'}`);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'x-api-builderbot': config.apiKey },
+            });
+
+            const data = await response.json();
+
+            return new Response(
+                JSON.stringify({ success: true, templates: data?.data || [] }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
+        // =============================================
+        // ACTION: send_template — Enviar plantilla Meta WhatsApp
+        // =============================================
+        if (action === 'send_template') {
+            const { number, templateName, languageCode, components } = payload;
+            const config = await getBuilderBotConfig(lineId || 'line_recepciones');
+            const url = `https://app.builderbot.cloud/api/v2/${config.projectId}/whatsapp-template`;
+
+            const body: any = {
+                to: number,
+                templateName,
+                languageCode: languageCode || 'es',
+            };
+            if (components && components.length > 0) {
+                body.components = components;
+            }
+
+            console.log(`[send-whatsapp] Enviando template "${templateName}" a ${number} | línea: ${lineId}`);
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-builderbot': config.apiKey,
+                },
+                body: JSON.stringify(body),
+            });
+
+            const data = await response.json();
+
+            return new Response(
+                JSON.stringify({ success: response.ok, data }),
+                { status: response.ok ? 200 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
+        // =============================================
+        // DEFAULT ACTION: Enviar mensaje regular
+        // =============================================
+        const { content, number, mediaUrl } = payload;
 
         if (!content || !number) {
             return new Response(
