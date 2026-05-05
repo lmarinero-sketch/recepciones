@@ -1148,7 +1148,19 @@ export default function ChequeoPanel({ addToast }) {
                                     ⏱ Tiempo restante estimado: ~{Math.ceil((bulkProgress.total - bulkProgress.sent - bulkProgress.failed) * 15 / 60)} min
                                 </p>
 
-                                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+                                {/* Warning: don't close */}
+                                <div style={{
+                                    margin: '16px 0', padding: '12px 16px', borderRadius: '10px',
+                                    background: '#FFFBEB', border: '1px solid #FDE68A',
+                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                }}>
+                                    <AlertCircle size={18} color="#D97706" style={{ flexShrink: 0 }} />
+                                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#92400E', lineHeight: 1.4 }}>
+                                        <strong>No cierres esta ventana ni navegues a otra sección.</strong> Si lo hacés, el envío se detendrá y los mensajes pendientes no se enviarán.
+                                    </p>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
                                     <button onClick={() => { bulkAbortRef.current = true; }} style={{
                                         padding: '8px 24px', borderRadius: '8px', border: '1px solid #fecaca',
                                         background: '#fef2f2', cursor: 'pointer', fontSize: '0.82rem',
