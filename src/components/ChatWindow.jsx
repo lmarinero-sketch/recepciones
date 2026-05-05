@@ -170,12 +170,16 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
         }
     }, [open]);
 
-    // Auto-resize textarea as content grows
+    // Auto-resize textarea as content grows (supports Shift+Enter line breaks)
     useEffect(() => {
         const textarea = inputRef.current;
         if (!textarea) return;
         textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+        const maxH = 120;
+        const newH = Math.min(textarea.scrollHeight, maxH);
+        textarea.style.height = newH + 'px';
+        // Show scrollbar only when content exceeds max height
+        textarea.style.overflowY = textarea.scrollHeight > maxH ? 'auto' : 'hidden';
     }, [inputText]);
 
     // ==========================================
