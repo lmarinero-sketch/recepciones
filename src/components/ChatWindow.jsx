@@ -170,6 +170,14 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
         }
     }, [open]);
 
+    // Auto-resize textarea as content grows
+    useEffect(() => {
+        const textarea = inputRef.current;
+        if (!textarea) return;
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }, [inputText]);
+
     // ==========================================
     // CARGAR SHORTCUTS
     // ==========================================
@@ -1267,9 +1275,11 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                                         borderRadius: '20px', border: 'none',
                                         fontSize: '0.88rem', outline: 'none',
                                         background: '#fff',
-                                        maxHeight: '100px', minHeight: '40px',
+                                        maxHeight: '120px', minHeight: '40px',
                                         lineHeight: 1.4,
                                         boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                                        overflow: 'hidden',
+                                        wordBreak: 'break-word',
                                     }}
                                 />
                             </div>
