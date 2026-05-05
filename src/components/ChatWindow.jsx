@@ -4,11 +4,11 @@
  * Features: Emojis, envío de imágenes, grabación de audio, polling + realtime
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     X, Send, Paperclip, Mic, Image as ImageIcon, Play, Pause,
     Phone, MessageSquare, Clock, CheckCheck, Check, Volume2,
-    Download, Smile, Square, Loader, Zap, Settings
+    Download, Smile, Square, Loader, Zap, Settings, AlertTriangle
 } from 'lucide-react';
 import { fetchMessages, markAsRead, saveOutgoingMessage, subscribeToMessages, upsertCrmContact, fetchWhatsAppLines, getAssignedLine, assignLine } from '../services/chatService';
 import { sendWhatsAppMessage } from '../services/builderbotApi';
@@ -213,6 +213,12 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     const handleSend = useCallback(async () => {
         if (!inputText.trim() || sending || !patientPhone) return;
 
+        // Block free-text messages when 24h window is expired (only shortcuts/templates allowed)
+        if (isWindowExpired && !inputText.startsWith('/')) {
+            addToast?.('⚠️ Ventana de 24hs expirada. Solo podés enviar una plantilla de WhatsApp (escribí / para ver las opciones).', 'error');
+            return;
+        }
+
         const text = inputText.trim();
         setInputText('');
         setSending(true);
@@ -235,7 +241,7 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
         } finally {
             setSending(false);
         }
-    }, [inputText, sending, patientPhone, addToast, assignedLineId]);
+    }, [inputText, sending, patientPhone, addToast, assignedLineId, isWindowExpired]);
 
     // ==========================================
     // ENVIAR IMAGEN
@@ -536,6 +542,34 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
         const sec = s % 60;
         return `${m}:${sec.toString().padStart(2, '0')}`;
     };
+
+    // ==========================================
+    // 24-HOUR WINDOW CHECK (WhatsApp Business Rule)
+    // ==========================================
+    const isWindowExpired = useMemo(() => {
+        if (!messages || messages.length === 0) return true;
+        // Find the last incoming message from the patient
+        const lastIncoming = [...messages].reverse().find(m => m.direction === 'incoming');
+        if (!lastIncoming) return true;
+        const lastIncomingTime = new Date(lastIncoming.created_at).getTime();
+        const now = Date.now();
+        const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+        return (now - lastIncomingTime) > TWENTY_FOUR_HOURS;
+    }, [messages]);
+
+    // Calcular tiempo transcurrido legible para el banner
+    const windowExpiredInfo = useMemo(() => {
+        if (!isWindowExpired) return null;
+        const lastIncoming = [...messages].reverse().find(m => m.direction === 'incoming');
+        if (!lastIncoming) return { text: 'No hay mensajes del paciente', hours: null };
+        const diffMs = Date.now() - new Date(lastIncoming.created_at).getTime();
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffHours / 24);
+        const text = diffDays > 0 
+            ? `Último mensaje del paciente hace ${diffDays} día${diffDays > 1 ? 's' : ''}` 
+            : `Último mensaje del paciente hace ${diffHours}hs`;
+        return { text, hours: diffHours };
+    }, [isWindowExpired, messages]);
 
     // ==========================================
     // RENDER HELPERS
@@ -867,6 +901,55 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                             );
                         })
                     )}
+
+                    {/* ===== 24H WINDOW EXPIRED BANNER (inline in messages) ===== */}
+                    {!loading && isWindowExpired && (
+                        <div style={{
+                            margin: '12px 0 4px',
+                            padding: '14px 18px',
+                            background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                            borderRadius: '12px',
+                            border: '1px solid #F59E0B40',
+                            boxShadow: '0 2px 8px rgba(245,158,11,0.15)',
+                            display: 'flex', alignItems: 'flex-start', gap: '12px',
+                            animation: 'scaleIn 0.2s ease-out',
+                        }}>
+                            <div style={{
+                                width: '36px', height: '36px', borderRadius: '10px',
+                                background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                flexShrink: 0, boxShadow: '0 2px 6px rgba(217,119,6,0.3)',
+                            }}>
+                                <AlertTriangle size={18} color="#fff" />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <p style={{
+                                    margin: '0 0 4px', fontSize: '0.82rem', fontWeight: 700,
+                                    color: '#92400E',
+                                }}>
+                                    ⏰ Ventana de 24hs expirada
+                                </p>
+                                <p style={{
+                                    margin: '0 0 6px', fontSize: '0.75rem', color: '#A16207',
+                                    lineHeight: 1.4,
+                                }}>
+                                    {windowExpiredInfo?.text || 'Han pasado más de 24 horas desde el último mensaje del paciente.'}. 
+                                    La única forma de iniciar una nueva conversación es utilizando una <strong>plantilla de WhatsApp</strong>, la cual tiene un costo por envío.
+                                </p>
+                                <p style={{
+                                    margin: 0, fontSize: '0.72rem', color: '#B45309',
+                                    fontWeight: 600, fontStyle: 'italic',
+                                }}>
+                                    💡 Escribí <span style={{
+                                        fontFamily: "'JetBrains Mono', monospace",
+                                        background: 'rgba(146,64,14,0.12)', padding: '1px 6px',
+                                        borderRadius: '4px', fontWeight: 700,
+                                    }}>/</span> en el compositor para seleccionar una plantilla aprobada.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div ref={messagesEndRef} />
                 </div>
 
@@ -898,6 +981,47 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                                 {emoji}
                             </button>
                         ))}
+                    </div>
+                )}
+
+                {/* ===== 24H EXPIRED COMPOSER BLOCKER ===== */}
+                {isWindowExpired && !loading && (
+                    <div style={{
+                        background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                        padding: '10px 16px',
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        borderTop: '1px solid #FDE68A',
+                    }}>
+                        <AlertTriangle size={16} style={{ color: '#D97706', flexShrink: 0 }} />
+                        <span style={{
+                            fontSize: '0.75rem', color: '#92400E', fontWeight: 600,
+                            flex: 1,
+                        }}>
+                            Ventana expirada — Solo podés enviar una plantilla de WhatsApp (tiene costo)
+                        </span>
+                        <button
+                            onClick={() => {
+                                setInputText('/');
+                                setShowShortcuts(true);
+                                setShortcutFilter('');
+                                setShortcutIndex(0);
+                                inputRef.current?.focus();
+                            }}
+                            style={{
+                                padding: '6px 14px', borderRadius: '8px',
+                                background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                                border: 'none', color: '#fff', cursor: 'pointer',
+                                fontSize: '0.75rem', fontWeight: 700,
+                                boxShadow: '0 2px 6px rgba(217,119,6,0.3)',
+                                transition: 'all 0.15s', whiteSpace: 'nowrap',
+                                display: 'flex', alignItems: 'center', gap: '4px',
+                            }}
+                            onMouseOver={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                            onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                            <Zap size={13} />
+                            Usar plantilla
+                        </button>
                     </div>
                 )}
 
@@ -1135,7 +1259,7 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                                     value={inputText}
                                     onChange={handleInputChange}
                                     onKeyDown={handleKeyDown}
-                                    placeholder="Escribí un mensaje... (/ para atajos)"
+                                    placeholder={isWindowExpired ? "⚠️ Ventana expirada — Escribí / para usar una plantilla" : "Escribí un mensaje... (/ para atajos)"}
                                     rows={1}
                                     style={{
                                         width: '100%', resize: 'none',
