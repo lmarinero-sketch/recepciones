@@ -6,6 +6,9 @@ import {
     CalendarClock, ChevronLeft, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { fetchPacientesChequeo, updateAsistencia, fetchObrasSociales } from '../services/visitasService';
+import { sendMetaTemplate } from '../services/metaTemplateService';
+import { normalizeArgentinePhone } from '../services/builderbotApi';
+import { saveOutgoingMessage } from '../services/chatService';
 import ChatWindow from './ChatWindow';
 
 // Calcula la fecha de hoy - 1 año en formato YYYY-MM-DD
@@ -231,7 +234,7 @@ export default function ChequeoPanel({ addToast }) {
         }
     }, [msgTarget, customMessage, addToast]);
 
-    // Envío masivo con 15s de delay entre cada mensaje
+    // Envío masivo con plantilla Meta "captar_clientes" y 15s de delay entre cada mensaje
     const confirmBulkSend = useCallback(async () => {
         const targets = selectedForBulk;
         setBulkSending(true);
@@ -243,32 +246,54 @@ export default function ChequeoPanel({ addToast }) {
 
             const p = targets[i];
             const nombre = p.paciente?.split(',')[0]?.trim() || 'Paciente';
-            const msg = customMessage.replace('{nombre}', nombre);
+            const normalizedPhone = normalizeArgentinePhone(p.telefono1);
 
             try {
-                // Mensajería desconectada — solo simula el progreso
-                await new Promise(r => setTimeout(r, 200)); // Simula delay breve
+                // Enviar plantilla Meta "captar_clientes" via WhatsApp Business API
+                await sendMetaTemplate({
+                    to: normalizedPhone,
+                    templateName: 'captar_clientes',
+                    languageCode: 'es_AR',
+                    components: [
+                        {
+                            type: 'body',
+                            parameters: [
+                                { type: 'text', text: nombre }
+                            ]
+                        }
+                    ],
+                });
+
+                // Registrar el mensaje enviado en la base de datos
+                await saveOutgoingMessage({
+                    phone: normalizedPhone,
+                    content: `📋 [Plantilla Meta] captar_clientes: ${customMessage.replace('{nombre}', nombre)}`,
+                    mediaType: 'text',
+                    lineId: 'line_recepciones',
+                }).catch(err => console.warn('Error saving outgoing msg:', err));
+
                 setBulkProgress(prev => ({ ...prev, sent: prev.sent + 1 }));
             } catch (e) {
-                console.error(`Error preparando para ${p.paciente}:`, e);
+                console.error(`Error enviando plantilla a ${p.paciente}:`, e);
                 setBulkProgress(prev => ({ ...prev, failed: prev.failed + 1 }));
             }
 
-            // Esperar 15 segundos antes del siguiente (excepto el último) — desactivado por ahora
-            // if (i < targets.length - 1 && !bulkAbortRef.current) {
-            //     await new Promise(r => setTimeout(r, 15000));
-            // }
+            // Esperar 15 segundos antes del siguiente (excepto el último)
+            if (i < targets.length - 1 && !bulkAbortRef.current) {
+                await new Promise(r => setTimeout(r, 15000));
+            }
         }
 
         setBulkSending(false);
         setShowMsgModal(false);
         setConfirmStep(false);
         setBulkSelectionMode(false);
+        const finalProgress = { ...bulkProgress };
         addToast?.(
-            `📋 Envío masivo simulado: ${targets.length} mensajes preparados. Conectar mensajería en Configuración para enviar realmente.`,
-            'info'
+            `✅ Envío masivo completado: ${targets.length - finalProgress.failed} enviados, ${finalProgress.failed} fallidos.`,
+            finalProgress.failed > 0 ? 'warning' : 'success'
         );
-    }, [selectedForBulk, customMessage, addToast]);
+    }, [selectedForBulk, customMessage, addToast, bulkProgress]);
 
     const formatDate = (dateStr) => {
         if (!dateStr) return '-';
@@ -1209,7 +1234,7 @@ export default function ChequeoPanel({ addToast }) {
                                             margin: 0,
                                         }}>
                                             {bulkMode ? (
-                                                <>Se enviarán <strong>{pacientesConTel.length} plantillas de mensaje de Meta (WhatsApp Business API)</strong>. Cada plantilla tiene un <strong>costo asociado</strong> que se cobra por conversación iniciada. El costo total será de <strong>{pacientesConTel.length} plantillas × costo unitario</strong>.</>
+                                                <>Se enviarán <strong>{selectedForBulk.length} plantillas "captar_clientes" de Meta (WhatsApp Business API)</strong>. Cada plantilla tiene un <strong>costo asociado</strong> que se cobra por conversación iniciada. El costo total será de <strong>{selectedForBulk.length} plantillas × costo unitario</strong>.</>
                                             ) : (
                                                 <>Para iniciar esta conversación se enviará una <strong>plantilla de mensaje de Meta (WhatsApp Business API)</strong>. Cada plantilla enviada tiene un <strong>costo asociado</strong> que se cobra por conversación iniciada.</>
                                             )}
