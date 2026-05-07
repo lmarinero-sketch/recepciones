@@ -268,9 +268,15 @@ export default function MessagingPanel({ addToast }) {
             try {
                 const msgs = await fetchMessages(selectedPhone);
                 setMessages(prev => {
-                    if (msgs.length !== prev.length) {
+                    // Preservar mensajes optimistic que aún no se guardaron en BD
+                    const pendingOptimistic = prev.filter(m => m._optimistic);
+                    const serverCount = msgs.length;
+                    const realCount = prev.filter(m => !m._optimistic).length;
+                    
+                    if (serverCount !== realCount) {
                         markAsRead(selectedPhone);
-                        return msgs;
+                        // Agregar optimistic pendientes al final del server data
+                        return [...msgs, ...pendingOptimistic];
                     }
                     return prev;
                 });
@@ -287,8 +293,22 @@ export default function MessagingPanel({ addToast }) {
         if (!selectedPhone) return;
         const unsub = subscribeToMessages(selectedPhone, (newMsg) => {
             setMessages(prev => {
-                const exists = prev.find(m => m.id === newMsg.id);
-                if (exists) return prev;
+                // Dedup: si ya existe con el mismo ID real, ignorar
+                const existsById = prev.find(m => m.id === newMsg.id);
+                if (existsById) return prev;
+                
+                // Si es outgoing y hay un optimistic con el mismo contenido, reemplazarlo
+                if (newMsg.direction === 'outgoing') {
+                    const optimisticIdx = prev.findIndex(m => 
+                        m._optimistic && m.content === newMsg.content && m.phone === newMsg.phone
+                    );
+                    if (optimisticIdx >= 0) {
+                        const updated = [...prev];
+                        updated[optimisticIdx] = { ...newMsg, _optimistic: false };
+                        return updated;
+                    }
+                }
+                
                 return [...prev, newMsg];
             });
             if (newMsg.direction === 'incoming') {
@@ -369,16 +389,73 @@ export default function MessagingPanel({ addToast }) {
     // ==========================================
     const handleSend = useCallback(async () => {
         if (!messageText.trim() || !selectedPhone || sending) return;
-        setSending(true);
+        const textToSend = messageText.trim();
+        
+        // === OPTIMISTIC UI: mensaje aparece INSTANTÁNEAMENTE ===
+        const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const optimisticMsg = {
+            id: optimisticId,
+            phone: selectedPhone,
+            direction: 'outgoing',
+            content: textToSend,
+            media_type: 'text',
+            media_url: null,
+            sender_name: 'Recepciones',
+            is_read: true,
+            line_id: assignedLineId || 'line_recepciones',
+            created_at: new Date().toISOString(),
+            _optimistic: true, // flag interno para tracking
+        };
+
+        // 1) Insertar en el state local → el mensaje aparece al instante
+        setMessages(prev => [...prev, optimisticMsg]);
+        
+        // 2) Limpiar input y UI inmediatamente
+        setMessageText('');
         setShowEmoji(false);
+        inputRef.current?.focus();
+        
+        // 3) Actualizar la lista de conversaciones (sidebar) optimisticamente
+        setConversations(prev => {
+            const idx = prev.findIndex(c => c.phone === selectedPhone);
+            if (idx >= 0) {
+                const updated = [...prev];
+                updated[idx] = {
+                    ...updated[idx],
+                    lastMessage: textToSend,
+                    lastDate: optimisticMsg.created_at,
+                    direction: 'outgoing',
+                };
+                return updated.sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate));
+            }
+            return prev;
+        });
+
+        // 4) Guardar en Supabase (dispara Realtime) + enviar por WhatsApp API en paralelo
+        //    El Realtime subscription tiene dedup por ID, así que reemplazará el optimistic
+        setSending(true);
         try {
-            await sendWhatsAppMessage({ content: messageText, number: selectedPhone, lineId: assignedLineId });
-            await saveOutgoingMessage({ phone: selectedPhone, content: messageText, lineId: assignedLineId });
-            // Realtime se encarga de agregar al state — evita duplicados
-            setMessageText('');
-            inputRef.current?.focus();
-        } catch (e) {
-            addToast?.('Error al enviar mensaje: ' + e.message, 'error');
+            // Primero guardar en BD (rápido, ~200ms) — esto genera el registro real
+            const savedMsg = await saveOutgoingMessage({ phone: selectedPhone, content: textToSend, lineId: assignedLineId });
+            
+            // Reemplazar el mensaje optimistic con el real (tiene ID de BD)
+            if (savedMsg?.id) {
+                setMessages(prev => prev.map(m => 
+                    m.id === optimisticId ? { ...savedMsg, _optimistic: false } : m
+                ));
+            }
+
+            // Enviar por WhatsApp API en background (lento, ~2-3s) — NO bloquea el UI
+            sendWhatsAppMessage({ content: textToSend, number: selectedPhone, lineId: assignedLineId })
+                .catch(apiErr => {
+                    console.error('Error enviando WhatsApp API:', apiErr);
+                    addToast?.('⚠️ El mensaje se guardó pero falló el envío por WhatsApp: ' + apiErr.message, 'error');
+                });
+        } catch (dbErr) {
+            console.error('Error guardando mensaje:', dbErr);
+            addToast?.('Error al guardar mensaje: ' + dbErr.message, 'error');
+            // Remover el mensaje optimistic si falló el guardado en BD
+            setMessages(prev => prev.filter(m => m.id !== optimisticId));
         } finally {
             setSending(false);
         }
