@@ -80,6 +80,10 @@ export async function createShortcut({ shortcut, label, message, category }) {
 
     if (error) {
         console.error('Error creating shortcut:', error);
+        // Error amigable para constraint de unicidad
+        if (error.code === '23505' || error.message?.includes('unique constraint')) {
+            throw new Error(`Ya existe una plantilla con el comando "${shortcut}". Usá un nombre diferente.`);
+        }
         throw error;
     }
     invalidateShortcutCache();
