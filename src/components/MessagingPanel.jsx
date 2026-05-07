@@ -413,7 +413,10 @@ export default function MessagingPanel({ addToast }) {
         // 2) Limpiar input y UI inmediatamente
         setMessageText('');
         setShowEmoji(false);
-        inputRef.current?.focus();
+        if (inputRef.current) {
+            inputRef.current.style.height = 'auto';
+            inputRef.current.focus();
+        }
         
         // 3) Actualizar la lista de conversaciones (sidebar) optimisticamente
         setConversations(prev => {
@@ -1278,14 +1281,19 @@ export default function MessagingPanel({ addToast }) {
                                         {uploadingMedia ? <Loader size={18} className="msg-panel__spinner" /> : <Paperclip size={18} />}
                                     </button>
                                     <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
-                                    <input
-                                        ref={inputRef} type="text"
+                                    <textarea
+                                        ref={inputRef}
                                         className="msg-panel__composer-input"
                                         placeholder="Escribe un mensaje... ( / para plantillas)"
                                         value={messageText}
                                         onChange={handleInputChange}
                                         onKeyDown={handleKeyDown}
                                         disabled={sending || uploadingMedia}
+                                        rows={1}
+                                        onInput={(e) => {
+                                            e.target.style.height = 'auto';
+                                            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                                        }}
                                     />
                                     {messageText.trim() ? (
                                         <button className="msg-panel__send-btn" onClick={handleSend}
