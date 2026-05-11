@@ -9,6 +9,7 @@ import { fetchPacientesChequeo, updateAsistencia, fetchObrasSociales } from '../
 import { sendMetaTemplate } from '../services/metaTemplateService';
 import { normalizeArgentinePhone } from '../services/builderbotApi';
 import { saveOutgoingMessage } from '../services/chatService';
+import { upsertCheckup } from '../services/reminderService';
 import ChatWindow from './ChatWindow';
 
 // Calcula la fecha de hoy - 1 año en formato YYYY-MM-DD
@@ -168,28 +169,24 @@ export default function ChequeoPanel({ addToast }) {
         }
     };
 
-    // Agendar Chequeo Confirmado
-    const handleSaveSchedule = useCallback(() => {
+    // Agendar Chequeo Confirmado — persistido en Supabase
+    const handleSaveSchedule = useCallback(async () => {
         if (!selectedPaciente || !scheduleDate) return;
         
         try {
-            const raw = localStorage.getItem('scheduled_checkups_v1');
-            const data = raw ? JSON.parse(raw) : {};
-            
-            data[selectedPaciente.dni] = {
+            await upsertCheckup({
                 dni: selectedPaciente.dni,
                 paciente: selectedPaciente.paciente,
                 telefono1: selectedPaciente.telefono1,
                 obra_social: selectedPaciente.obra_social,
-                fecha: scheduleDate,
-                estado: 'pendiente' // For remarketing funnel
-            };
-            
-            localStorage.setItem('scheduled_checkups_v1', JSON.stringify(data));
+                fecha_turno: scheduleDate,
+                estado: 'pendiente',
+            });
             addToast?.(`Turno confirmado guardado para el ${formatDate(scheduleDate)}`, 'success');
             setShowScheduleModal(false);
             setScheduleDate('');
         } catch (e) {
+            console.error('Error saving schedule:', e);
             addToast?.('Error al guardar el turno', 'error');
         }
     }, [selectedPaciente, scheduleDate, addToast]);
