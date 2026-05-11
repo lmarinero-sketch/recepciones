@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     Search, Filter, Users, Calendar, Phone, Send, ChevronDown, ChevronRight,
     MapPin, Building2, Stethoscope, Clock, FileText, AlertCircle, X, RefreshCw,
@@ -10,9 +10,7 @@ import { sendMetaTemplate } from '../services/metaTemplateService';
 import { normalizeArgentinePhone } from '../services/builderbotApi';
 import { saveOutgoingMessage } from '../services/chatService';
 import { upsertCheckup } from '../services/reminderService';
-
-// Lazy-load ChatWindow to avoid TDZ initialization errors in bundled code
-const ChatWindow = lazy(() => import('./ChatWindow'));
+import ChatWindow from './ChatWindow';
 
 // Calcula la fecha de hoy - 1 año en formato YYYY-MM-DD
 function getOneYearAgoToday() {
@@ -1450,20 +1448,18 @@ export default function ChequeoPanel({ addToast }) {
             )}
 
             {chatOpen && chatPatient && chatPatient.telefono1 && (
-                <Suspense fallback={null}>
-                    <ChatWindow
-                        open={chatOpen}
-                        onClose={() => setChatOpen(false)}
-                        patientName={chatPatient.paciente}
-                        patientPhone={normalizeArgentinePhone(chatPatient.telefono1)}
-                        patientContext={{
-                            dni: chatPatient.dni,
-                            idPaciente: chatPatient.id,
-                            obraSocial: chatPatient.obra_social,
-                        }}
-                        addToast={addToast}
-                    />
-                </Suspense>
+                <ChatWindow
+                    open={chatOpen}
+                    onClose={() => setChatOpen(false)}
+                    patientName={chatPatient.paciente}
+                    patientPhone={normalizeArgentinePhone(chatPatient.telefono1)}
+                    patientContext={{
+                        dni: chatPatient.dni,
+                        idPaciente: chatPatient.id,
+                        obraSocial: chatPatient.obra_social,
+                    }}
+                    addToast={addToast}
+                />
             )}
         </div>
     );

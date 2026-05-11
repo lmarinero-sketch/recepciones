@@ -4,7 +4,7 @@
  * Features: Emojis, envío de imágenes, grabación de audio, polling + realtime
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     X, Send, Paperclip, Mic, Image as ImageIcon, Play, Pause,
     Phone, MessageSquare, Clock, CheckCheck, Check, Volume2,
@@ -14,7 +14,7 @@ import { fetchMessages, markAsRead, saveOutgoingMessage, subscribeToMessages, up
 import { sendWhatsAppMessage } from '../services/builderbotApi';
 import { fetchShortcuts } from '../services/shortcutService';
 import { supabase } from '../lib/supabase';
-const ShortcutManager = lazy(() => import('./ShortcutManager'));
+import ShortcutManager from './ShortcutManager';
 
 // Emojis populares organizados
 const EMOJI_LIST = [
@@ -1361,13 +1361,11 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
             )}
 
             {/* Shortcut Manager Modal */}
-            <Suspense fallback={null}>
-                <ShortcutManager
-                    isOpen={showShortcutManager}
-                    onClose={() => { setShowShortcutManager(false); loadShortcutsData(); }}
-                    addToast={addToast}
-                />
-            </Suspense>
+            <ShortcutManager
+                isOpen={showShortcutManager}
+                onClose={() => { setShowShortcutManager(false); loadShortcutsData(); }}
+                addToast={addToast}
+            />
 
             {/* ===== LINE SELECTOR (first time) ===== */}
             {showLineSelector && whatsappLines.length > 0 && (

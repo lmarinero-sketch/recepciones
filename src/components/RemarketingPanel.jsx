@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     RefreshCw, Users, Search, Phone, Loader2, X, ChevronRight,
     UserCheck, UserX, CalendarClock, CheckCircle2, Send,
@@ -9,8 +9,7 @@ import { fetchScheduledCheckups, updateCheckupStatus, incrementAttempts, deleteC
 import { sendMetaTemplate } from '../services/metaTemplateService';
 import { normalizeArgentinePhone } from '../services/builderbotApi';
 import { saveOutgoingMessage } from '../services/chatService';
-
-const ChatWindow = lazy(() => import('./ChatWindow'));
+import ChatWindow from './ChatWindow';
 
 const PIPELINE_STATES = [
     { key: 'pendiente', label: 'Pendiente', icon: Clock, color: '#94a3b8', bg: '#f8fafc' },
@@ -428,16 +427,14 @@ export default function RemarketingPanel({ addToast }) {
 
             {/* Chat Window */}
             {chatOpen && chatPatient && chatPatient.telefono1 && (
-                <Suspense fallback={null}>
-                    <ChatWindow
-                        open={chatOpen}
-                        onClose={() => setChatOpen(false)}
-                        patientName={chatPatient.paciente}
-                        patientPhone={normalizeArgentinePhone(chatPatient.telefono1)}
-                        patientContext={{ dni: chatPatient.dni, obraSocial: chatPatient.obra_social }}
-                        addToast={addToast}
-                    />
-                </Suspense>
+                <ChatWindow
+                    open={chatOpen}
+                    onClose={() => setChatOpen(false)}
+                    patientName={chatPatient.paciente}
+                    patientPhone={normalizeArgentinePhone(chatPatient.telefono1)}
+                    patientContext={{ dni: chatPatient.dni, obraSocial: chatPatient.obra_social }}
+                    addToast={addToast}
+                />
             )}
         </div>
     );
