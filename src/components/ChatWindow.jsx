@@ -25,7 +25,7 @@ const EMOJI_LIST = [
     '🙏', '💯', '🎉', '🎊', '👋', '👌', '🤙', '📌', '⏰', '🗓️',
 ];
 
-export default function ChatWindow({ open, onClose, patientName, patientPhone, patientContext = {}, addToast }) {
+export default function ChatWindow({ open, onClose, patientName, patientPhone, patientContext = {}, addToast, defaultLineLabel, autoShowTemplates }) {
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [inputText, setInputText] = useState('');
@@ -131,16 +131,31 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     // Load WhatsApp lines + assigned line
     useEffect(() => {
         if (!open) return;
-        fetchWhatsAppLines().then(setWhatsappLines).catch(console.error);
-    }, [open]);
+        fetchWhatsAppLines().then(lines => {
+            setWhatsappLines(lines);
+            // If defaultLineLabel is set, auto-assign without showing selector
+            if (defaultLineLabel && lines.length > 0) {
+                const defaultLine = lines.find(l => l.label === defaultLineLabel);
+                if (defaultLine) {
+                    setAssignedLineId(defaultLine.id);
+                    // Also persist the assignment
+                    if (patientPhone) {
+                        assignLine(patientPhone, defaultLine.id).catch(console.error);
+                    }
+                }
+            }
+        }).catch(console.error);
+    }, [open, defaultLineLabel, patientPhone]);
 
     useEffect(() => {
         if (!open || !patientPhone) return;
+        // Skip line selector when defaultLineLabel is set
+        if (defaultLineLabel) return;
         getAssignedLine(patientPhone).then(lineId => {
             setAssignedLineId(lineId);
             if (!lineId) setShowLineSelector(true);
         }).catch(console.error);
-    }, [open, patientPhone]);
+    }, [open, patientPhone, defaultLineLabel]);
 
     // Get current line info
     const currentLine = whatsappLines.find(l => l.id === assignedLineId) || null;
@@ -194,7 +209,13 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     useEffect(() => {
         if (!open) return;
         loadShortcutsData();
-    }, [open, loadShortcutsData]);
+        // Auto-show templates when prop is set
+        if (autoShowTemplates) {
+            setInputText('/');
+            setShowShortcuts(true);
+            setShortcutFilter('');
+        }
+    }, [open, loadShortcutsData, autoShowTemplates]);
 
     // ==========================================
     // UPLOAD MEDIA A SUPABASE STORAGE

@@ -434,6 +434,8 @@ export default function RemarketingPanel({ addToast }) {
                     patientPhone={normalizeArgentinePhone(chatPatient.telefono1)}
                     patientContext={{ dni: chatPatient.dni, obraSocial: chatPatient.obra_social }}
                     addToast={addToast}
+                    defaultLineLabel="Recepciones Chequeos"
+                    autoShowTemplates
                 />
             )}
         </div>

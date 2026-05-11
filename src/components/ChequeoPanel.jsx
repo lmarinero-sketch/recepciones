@@ -1459,6 +1459,8 @@ export default function ChequeoPanel({ addToast }) {
                         obraSocial: chatPatient.obra_social,
                     }}
                     addToast={addToast}
+                    defaultLineLabel="Recepciones Chequeos"
+                    autoShowTemplates
                 />
             )}
         </div>
