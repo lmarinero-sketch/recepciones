@@ -220,6 +220,34 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     };
 
     // ==========================================
+    // 24-HOUR WINDOW CHECK (WhatsApp Business Rule)
+    // ==========================================
+    const isWindowExpired = useMemo(() => {
+        if (!messages || messages.length === 0) return true;
+        // Find the last incoming message from the patient
+        const lastIncoming = [...messages].reverse().find(m => m.direction === 'incoming');
+        if (!lastIncoming) return true;
+        const lastIncomingTime = new Date(lastIncoming.created_at).getTime();
+        const now = Date.now();
+        const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+        return (now - lastIncomingTime) > TWENTY_FOUR_HOURS;
+    }, [messages]);
+
+    // Calcular tiempo transcurrido legible para el banner
+    const windowExpiredInfo = useMemo(() => {
+        if (!isWindowExpired) return null;
+        const lastIncoming = [...messages].reverse().find(m => m.direction === 'incoming');
+        if (!lastIncoming) return { text: 'No hay mensajes del paciente', hours: null };
+        const diffMs = Date.now() - new Date(lastIncoming.created_at).getTime();
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffHours / 24);
+        const text = diffDays > 0 
+            ? `Último mensaje del paciente hace ${diffDays} día${diffDays > 1 ? 's' : ''}` 
+            : `Último mensaje del paciente hace ${diffHours}hs`;
+        return { text, hours: diffHours };
+    }, [isWindowExpired, messages]);
+
+    // ==========================================
     // ENVIAR MENSAJE DE TEXTO
     // ==========================================
     const handleSend = useCallback(async () => {
@@ -555,33 +583,7 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
         return `${m}:${sec.toString().padStart(2, '0')}`;
     };
 
-    // ==========================================
-    // 24-HOUR WINDOW CHECK (WhatsApp Business Rule)
-    // ==========================================
-    const isWindowExpired = useMemo(() => {
-        if (!messages || messages.length === 0) return true;
-        // Find the last incoming message from the patient
-        const lastIncoming = [...messages].reverse().find(m => m.direction === 'incoming');
-        if (!lastIncoming) return true;
-        const lastIncomingTime = new Date(lastIncoming.created_at).getTime();
-        const now = Date.now();
-        const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-        return (now - lastIncomingTime) > TWENTY_FOUR_HOURS;
-    }, [messages]);
 
-    // Calcular tiempo transcurrido legible para el banner
-    const windowExpiredInfo = useMemo(() => {
-        if (!isWindowExpired) return null;
-        const lastIncoming = [...messages].reverse().find(m => m.direction === 'incoming');
-        if (!lastIncoming) return { text: 'No hay mensajes del paciente', hours: null };
-        const diffMs = Date.now() - new Date(lastIncoming.created_at).getTime();
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffDays = Math.floor(diffHours / 24);
-        const text = diffDays > 0 
-            ? `Último mensaje del paciente hace ${diffDays} día${diffDays > 1 ? 's' : ''}` 
-            : `Último mensaje del paciente hace ${diffHours}hs`;
-        return { text, hours: diffHours };
-    }, [isWindowExpired, messages]);
 
     // ==========================================
     // RENDER HELPERS
