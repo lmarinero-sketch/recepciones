@@ -1450,12 +1450,12 @@ export default function ChequeoPanel({ addToast }) {
                 </div>
             )}
 
-            {chatOpen && chatPatient && (
+            {chatOpen && chatPatient && chatPatient.telefono1 && (
                 <ChatWindow
                     open={chatOpen}
                     onClose={() => setChatOpen(false)}
                     patientName={chatPatient.paciente}
-                    patientPhone={chatPatient.telefono1}
+                    patientPhone={normalizeArgentinePhone(chatPatient.telefono1)}
                     patientContext={{
                         dni: chatPatient.dni,
                         idPaciente: chatPatient.id,
