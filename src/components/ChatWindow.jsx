@@ -1047,7 +1047,15 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                                     transition: 'background 0.15s',
                                 }}
                                 onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
-                                onMouseOut={e => e.currentTarget.s                {/* ===== 24H EXPIRED COMPOSER BLOCKER ===== */}
+                                onMouseOut={e => e.currentTarget.style.background = 'none'}
+                            >
+                                {emoji}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* ===== 24H EXPIRED COMPOSER BLOCKER ===== */}
                 {isWindowExpired && !loading ? (
                     <div style={{
                         background: '#FFFBEB',
