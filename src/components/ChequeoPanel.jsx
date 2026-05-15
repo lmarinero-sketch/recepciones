@@ -6,7 +6,7 @@ import {
     CalendarClock, ChevronLeft, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { fetchPacientesChequeo, updateAsistencia, fetchObrasSociales } from '../services/visitasService';
-import { sendMetaTemplate } from '../services/metaTemplateService';
+import { sendMetaTemplate, fetchMetaTemplates } from '../services/metaTemplateService';
 import { normalizeArgentinePhone } from '../services/builderbotApi';
 import { saveOutgoingMessage } from '../services/chatService';
 import { upsertCheckup } from '../services/reminderService';
@@ -55,6 +55,10 @@ export default function ChequeoPanel({ addToast }) {
     const [bulkProgress, setBulkProgress] = useState({ sent: 0, failed: 0, total: 0 });
     const bulkAbortRef = useRef(false);
 
+    // Meta Templates
+    const [metaTemplates, setMetaTemplates] = useState([]);
+    const [selectedMetaTemplate, setSelectedMetaTemplate] = useState(null);
+
     const [isMensual, setIsMensual] = useState(false);
     const [obraSocial, setObraSocial] = useState('');
     const [obrasSocialesList, setObrasSocialesList] = useState([]);
@@ -87,6 +91,9 @@ export default function ChequeoPanel({ addToast }) {
             const valid = list.filter(os => /^\d/.test(os));
             setObrasSocialesList(valid);
         }).catch(console.error);
+
+        // Fetch meta templates for bulk messaging
+        fetchMetaTemplates().then(setMetaTemplates).catch(console.error);
     }, []);
 
     const loadData = useCallback(async () => {
@@ -207,13 +214,15 @@ export default function ChequeoPanel({ addToast }) {
             }
             setBulkMode(true);
             setMsgTarget(null);
-            setCustomMessage(
-                'Hola {nombre}, desde el Sanatorio Argentino le recordamos la importancia de realizar sus controles preventivos de salud. ¿Le gustaría agendar un turno para su próximo chequeo? Estamos a su disposición. 🏥'
-            );
+            
+            // Auto-select "captar_clientes" if available
+            const defaultTpl = metaTemplates.find(t => (t.name || t.templateName) === 'captar_clientes');
+            setSelectedMetaTemplate(defaultTpl || metaTemplates[0] || null);
+
             setShowMsgModal(true);
             setConfirmStep(false);
         }
-    }, [pacientesConTel, bulkSelectionMode, selectedForBulk, addToast]);
+    }, [pacientesConTel, bulkSelectionMode, selectedForBulk, addToast, metaTemplates]);
 
     const confirmSend = useCallback(async () => {
         if (!msgTarget?.telefono1 || !customMessage.trim()) return;
@@ -231,12 +240,18 @@ export default function ChequeoPanel({ addToast }) {
         }
     }, [msgTarget, customMessage, addToast]);
 
-    // Envío masivo con plantilla Meta "captar_clientes" y 15s de delay entre cada mensaje
+    // Envío masivo con plantilla Meta seleccionada
     const confirmBulkSend = useCallback(async () => {
+        if (!selectedMetaTemplate) return;
+        
         const targets = selectedForBulk;
         setBulkSending(true);
         setBulkProgress({ sent: 0, failed: 0, total: targets.length });
         bulkAbortRef.current = false;
+
+        const templateName = selectedMetaTemplate.name || selectedMetaTemplate.templateName;
+        const languageCode = selectedMetaTemplate.language || 'es_AR';
+        const templateMessage = selectedMetaTemplate.body || selectedMetaTemplate.text || selectedMetaTemplate.components?.find(c => c.type === 'BODY')?.text || `[Plantilla: ${templateName}]`;
 
         for (let i = 0; i < targets.length; i++) {
             if (bulkAbortRef.current) break;
@@ -246,11 +261,11 @@ export default function ChequeoPanel({ addToast }) {
             const normalizedPhone = normalizeArgentinePhone(p.telefono1);
 
             try {
-                // Enviar plantilla Meta "captar_clientes" via WhatsApp Business API
+                // Enviar plantilla Meta seleccionada
                 await sendMetaTemplate({
                     to: normalizedPhone,
-                    templateName: 'captar_clientes',
-                    languageCode: 'es_AR',
+                    templateName: templateName,
+                    languageCode: languageCode,
                     components: [
                         {
                             type: 'body',
@@ -264,7 +279,7 @@ export default function ChequeoPanel({ addToast }) {
                 // Registrar el mensaje enviado en la base de datos
                 await saveOutgoingMessage({
                     phone: normalizedPhone,
-                    content: `📋 [Plantilla Meta] captar_clientes: ${customMessage.replace('{nombre}', nombre)}`,
+                    content: `📋 [Plantilla Meta] ${templateName}: ${templateMessage.replace(/\{\{1\}\}/g, nombre)}`,
                     mediaType: 'text',
                     lineId: 'line_recepciones',
                 }).catch(err => console.warn('Error saving outgoing msg:', err));
@@ -290,7 +305,7 @@ export default function ChequeoPanel({ addToast }) {
             `✅ Envío masivo completado: ${targets.length - finalProgress.failed} enviados, ${finalProgress.failed} fallidos.`,
             finalProgress.failed > 0 ? 'warning' : 'success'
         );
-    }, [selectedForBulk, customMessage, addToast, bulkProgress]);
+    }, [selectedForBulk, selectedMetaTemplate, addToast, bulkProgress]);
 
     const formatDate = (dateStr) => {
         if (!dateStr) return '-';
@@ -1169,26 +1184,60 @@ export default function ChequeoPanel({ addToast }) {
                             </div>
                         ) : !confirmStep ? (
                             <>
-                                {/* PASO 1: Editar mensaje */}
+                                {/* PASO 1: Elegir plantilla Meta */}
                                 <div style={{ padding: '20px 24px' }}>
-                                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '6px', display: 'block' }}>
-                                        Mensaje a enviar por WhatsApp
+                                    <div style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        marginBottom: '16px', background: '#eff6ff',
+                                        padding: '12px 16px', borderRadius: '10px', border: '1px solid #bfdbfe'
+                                    }}>
+                                        <AlertCircle size={18} color="#2563eb" style={{ flexShrink: 0 }} />
+                                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#1e40af', lineHeight: 1.4 }}>
+                                            Estás iniciando conversaciones fuera de la ventana de 24 horas. 
+                                            <strong> La única forma de comunicarte es enviando una plantilla oficial aprobada por Meta.</strong>
+                                        </p>
+                                    </div>
+                                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#475569', marginBottom: '8px', display: 'block' }}>
+                                        Selecciona la plantilla oficial de Meta
                                     </label>
-                                    <textarea
-                                        value={customMessage}
-                                        onChange={e => setCustomMessage(e.target.value)}
-                                        rows={6}
+                                    
+                                    <select
+                                        value={selectedMetaTemplate ? (selectedMetaTemplate.name || selectedMetaTemplate.templateName) : ''}
+                                        onChange={e => {
+                                            const t = metaTemplates.find(tpl => (tpl.name || tpl.templateName) === e.target.value);
+                                            setSelectedMetaTemplate(t || null);
+                                        }}
                                         style={{
                                             width: '100%', padding: '12px', borderRadius: '10px',
                                             border: '1px solid #e2e8f0', fontSize: '0.85rem',
-                                            resize: 'vertical', outline: 'none', fontFamily: 'inherit',
-                                            lineHeight: 1.5,
+                                            outline: 'none', background: '#fff', cursor: 'pointer',
+                                            marginBottom: '16px', fontWeight: 600, color: '#1e293b'
                                         }}
-                                    />
-                                    <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '6px' }}>
-                                        {customMessage.length} caracteres
-                                        {bulkMode && <> • Usá <strong>{'{nombre}'}</strong> para personalizar con el nombre del paciente</>}
-                                    </p>
+                                    >
+                                        <option value="" disabled>-- Selecciona una plantilla --</option>
+                                        {metaTemplates.map(t => (
+                                            <option key={t.id || t.name || t.templateName} value={t.name || t.templateName}>
+                                                {t.name || t.templateName}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    {selectedMetaTemplate && (
+                                        <div style={{
+                                            background: '#f8fafc', padding: '16px', borderRadius: '10px',
+                                            border: '1px dashed #cbd5e1'
+                                        }}>
+                                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px' }}>
+                                                Contenido del mensaje
+                                            </div>
+                                            <p style={{
+                                                fontSize: '0.85rem', color: '#334155', margin: 0,
+                                                lineHeight: 1.5, whiteSpace: 'pre-wrap', fontStyle: 'italic'
+                                            }}>
+                                                {selectedMetaTemplate.body || selectedMetaTemplate.text || selectedMetaTemplate.components?.find(c => c.type === 'BODY')?.text || '[Sin contenido]'}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                                 <div style={{
                                     padding: '16px 24px', borderTop: '1px solid #f1f5f9',
@@ -1203,14 +1252,14 @@ export default function ChequeoPanel({ addToast }) {
                                     </button>
                                     <button
                                         onClick={() => setConfirmStep(true)}
-                                        disabled={!customMessage.trim()}
+                                        disabled={!selectedMetaTemplate}
                                         style={{
                                             display: 'flex', alignItems: 'center', gap: '6px',
                                             padding: '8px 24px', borderRadius: '8px', border: 'none',
                                             background: 'linear-gradient(135deg, #25D366, #128C7E)',
                                             cursor: 'pointer', fontSize: '0.82rem',
                                             color: '#fff', fontWeight: 700,
-                                            opacity: !customMessage.trim() ? 0.6 : 1,
+                                            opacity: !selectedMetaTemplate ? 0.6 : 1,
                                             boxShadow: '0 2px 8px rgba(37,211,102,.3)',
                                         }}
                                     >
@@ -1243,7 +1292,7 @@ export default function ChequeoPanel({ addToast }) {
                                             margin: 0,
                                         }}>
                                             {bulkMode ? (
-                                                <>Se enviarán <strong>{selectedForBulk.length} plantillas "captar_clientes" de Meta (WhatsApp Business API)</strong>. Cada plantilla tiene un <strong>costo asociado</strong> que se cobra por conversación iniciada. El costo total será de <strong>{selectedForBulk.length} plantillas × costo unitario</strong>.</>
+                                                <>Se enviarán <strong>{selectedForBulk.length} plantillas "{selectedMetaTemplate?.name || selectedMetaTemplate?.templateName}" de Meta (WhatsApp Business API)</strong>. Cada plantilla tiene un <strong>costo asociado</strong> que se cobra por conversación iniciada. El costo total será de <strong>{selectedForBulk.length} plantillas × costo unitario</strong>.</>
                                             ) : (
                                                 <>Para iniciar esta conversación se enviará una <strong>plantilla de mensaje de Meta (WhatsApp Business API)</strong>. Cada plantilla enviada tiene un <strong>costo asociado</strong> que se cobra por conversación iniciada.</>
                                             )}

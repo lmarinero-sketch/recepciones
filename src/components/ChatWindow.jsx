@@ -13,6 +13,7 @@ import {
 import { fetchMessages, markAsRead, saveOutgoingMessage, subscribeToMessages, upsertCrmContact, fetchWhatsAppLines, getAssignedLine, assignLine } from '../services/chatService';
 import { sendWhatsAppMessage } from '../services/builderbotApi';
 import { fetchShortcuts } from '../services/shortcutService';
+import { fetchMetaTemplates, sendMetaTemplate } from '../services/metaTemplateService';
 import { supabase } from '../lib/supabase';
 import ShortcutManager from './ShortcutManager';
 
@@ -38,10 +39,14 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     const [uploadingMedia, setUploadingMedia] = useState(false);
     // Shortcuts state
     const [shortcuts, setShortcuts] = useState([]);
+    const [metaTemplates, setMetaTemplates] = useState([]);
     const [showShortcuts, setShowShortcuts] = useState(false);
     const [shortcutFilter, setShortcutFilter] = useState('');
     const [shortcutIndex, setShortcutIndex] = useState(0);
     const [showShortcutManager, setShowShortcutManager] = useState(false);
+    const [showMetaCostModal, setShowMetaCostModal] = useState(false);
+    const [pendingMetaTemplate, setPendingMetaTemplate] = useState(null);
+    const [sendingMetaTemplate, setSendingMetaTemplate] = useState(false);
     // Dual WhatsApp line state
     const [whatsappLines, setWhatsappLines] = useState([]);
     const [assignedLineId, setAssignedLineId] = useState(null);
@@ -203,6 +208,9 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     const loadShortcutsData = useCallback(() => {
         fetchShortcuts(true).then(setShortcuts).catch(err => {
             console.warn('Could not load shortcuts:', err);
+        });
+        fetchMetaTemplates().then(setMetaTemplates).catch(err => {
+            console.warn('Could not load Meta templates:', err);
         });
     }, []);
 
@@ -457,7 +465,18 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     // ==========================================
     // SHORTCUTS — Lógica de detección y selección
     // ==========================================
-    const filteredShortcuts = shortcuts.filter(s => {
+    const metaAsShortcuts = metaTemplates.map(t => ({
+        id: `meta_${t.name || t.id}`,
+        shortcut: t.name || t.templateName || 'template',
+        label: t.name || t.templateName || 'Template',
+        message: t.body || t.text || t.components?.find(c => c.type === 'BODY')?.text || `[Plantilla: ${t.name}]`,
+        category: 'WhatsApp Meta',
+        _isMeta: true,
+        _metaData: t,
+    }));
+    const allShortcuts = [...shortcuts, ...metaAsShortcuts];
+
+    const filteredShortcuts = allShortcuts.filter(s => {
         if (!shortcutFilter) return true;
         const q = shortcutFilter.toLowerCase();
         return s.shortcut.toLowerCase().includes(q) ||
@@ -529,6 +548,15 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     }, [patientContext]);
 
     const selectShortcut = useCallback((shortcut) => {
+        if (shortcut._isMeta) {
+            setPendingMetaTemplate(shortcut);
+            setShowMetaCostModal(true);
+            setShowShortcuts(false);
+            setShortcutFilter('');
+            setShortcutIndex(0);
+            return;
+        }
+
         const personalized = personalizeMessage(shortcut.message, patientName);
         setInputText(personalized);
         setShowShortcuts(false);
@@ -537,8 +565,61 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
         inputRef.current?.focus();
     }, [patientName, personalizeMessage]);
 
-    // Enter para enviar o seleccionar shortcut
+    // Confirmar y enviar Meta Template
+    const confirmSendMetaTemplate = useCallback(async () => {
+        if (!pendingMetaTemplate || !patientPhone || sendingMetaTemplate) return;
+        setSendingMetaTemplate(true);
+        try {
+            const templateName = pendingMetaTemplate._metaData?.name || pendingMetaTemplate.shortcut;
+            const lang = pendingMetaTemplate._metaData?.language || 'es';
+            await sendMetaTemplate({
+                to: patientPhone,
+                templateName,
+                languageCode: lang,
+            });
+            // Guardar como mensaje saliente en la BD para que aparezca en el chat
+            const newLineId = currentLine?.id || 'line_recepciones';
+            await saveOutgoingMessage({
+                phone: patientPhone,
+                content: `📋 [Plantilla Meta] ${templateName}: ${pendingMetaTemplate.message}`,
+                lineId: newLineId,
+            });
+            
+            // Refrescar mensajes
+            const msgs = await fetchMessages(patientPhone);
+            setMessages(msgs);
+            
+            addToast?.(`Plantilla "${templateName}" enviada`, 'success');
+        } catch (err) {
+            console.error('Error sending Meta template:', err);
+            addToast?.(`Error enviando plantilla: ${err.message}`, 'error');
+        } finally {
+            setSendingMetaTemplate(false);
+            setShowMetaCostModal(false);
+            setPendingMetaTemplate(null);
+            inputRef.current?.focus();
+        }
+    }, [pendingMetaTemplate, patientPhone, sendingMetaTemplate, addToast, currentLine, fetchMessages]);
+
+    // Global keyboard listener for Meta cost modal (Enter/Escape)
+    useEffect(() => {
+        if (!showMetaCostModal) return;
+        const handleGlobalKey = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); confirmSendMetaTemplate(); }
+            if (e.key === 'Escape') { e.preventDefault(); setShowMetaCostModal(false); setPendingMetaTemplate(null); }
+        };
+        window.addEventListener('keydown', handleGlobalKey);
+        return () => window.removeEventListener('keydown', handleGlobalKey);
+    }, [showMetaCostModal, confirmSendMetaTemplate]);
+
     const handleKeyDown = (e) => {
+        // Meta cost modal — Enter para aceptar, Escape para cancelar
+        if (showMetaCostModal) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmSendMetaTemplate(); return; }
+            if (e.key === 'Escape') { e.preventDefault(); setShowMetaCostModal(false); setPendingMetaTemplate(null); return; }
+            return;
+        }
+
         // Navegación en shortcuts popup
         if (showShortcuts && filteredShortcuts.length > 0) {
             if (e.key === 'ArrowDown') {
@@ -938,52 +1019,7 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                     )}
 
                     {/* ===== 24H WINDOW EXPIRED BANNER (inline in messages) ===== */}
-                    {!loading && isWindowExpired && (
-                        <div style={{
-                            margin: '12px 0 4px',
-                            padding: '14px 18px',
-                            background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
-                            borderRadius: '12px',
-                            border: '1px solid #F59E0B40',
-                            boxShadow: '0 2px 8px rgba(245,158,11,0.15)',
-                            display: 'flex', alignItems: 'flex-start', gap: '12px',
-                            animation: 'scaleIn 0.2s ease-out',
-                        }}>
-                            <div style={{
-                                width: '36px', height: '36px', borderRadius: '10px',
-                                background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                flexShrink: 0, boxShadow: '0 2px 6px rgba(217,119,6,0.3)',
-                            }}>
-                                <AlertTriangle size={18} color="#fff" />
-                            </div>
-                            <div style={{ flex: 1 }}>
-                                <p style={{
-                                    margin: '0 0 4px', fontSize: '0.82rem', fontWeight: 700,
-                                    color: '#92400E',
-                                }}>
-                                    ⏰ Ventana de 24hs expirada
-                                </p>
-                                <p style={{
-                                    margin: '0 0 6px', fontSize: '0.75rem', color: '#A16207',
-                                    lineHeight: 1.4,
-                                }}>
-                                    {windowExpiredInfo?.text || 'Han pasado más de 24 horas desde el último mensaje del paciente.'}. 
-                                    La única forma de iniciar una nueva conversación es utilizando una <strong>plantilla de WhatsApp</strong>, la cual tiene un costo por envío.
-                                </p>
-                                <p style={{
-                                    margin: 0, fontSize: '0.72rem', color: '#B45309',
-                                    fontWeight: 600, fontStyle: 'italic',
-                                }}>
-                                    💡 Escribí <span style={{
-                                        fontFamily: "'JetBrains Mono', monospace",
-                                        background: 'rgba(146,64,14,0.12)', padding: '1px 6px',
-                                        borderRadius: '4px', fontWeight: 700,
-                                    }}>/</span> en el compositor para seleccionar una plantilla aprobada.
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                    {/* Hiding the inline banner because we'll replace the composer completely */}
 
                     <div ref={messagesEndRef} />
                 </div>
@@ -1011,335 +1047,434 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                                     transition: 'background 0.15s',
                                 }}
                                 onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
-                                onMouseOut={e => e.currentTarget.style.background = 'none'}
-                            >
-                                {emoji}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
-                {/* ===== 24H EXPIRED COMPOSER BLOCKER ===== */}
-                {isWindowExpired && !loading && (
+                                onMouseOut={e => e.currentTarget.s                {/* ===== 24H EXPIRED COMPOSER BLOCKER ===== */}
+                {isWindowExpired && !loading ? (
                     <div style={{
-                        background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
-                        padding: '10px 16px',
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        borderTop: '1px solid #FDE68A',
+                        background: '#FFFBEB',
+                        padding: '16px 20px',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+                        borderTop: '2px solid #FDE68A',
+                        textAlign: 'center'
                     }}>
-                        <AlertTriangle size={16} style={{ color: '#D97706', flexShrink: 0 }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400E', fontWeight: '600' }}>
+                            <AlertTriangle size={18} />
+                            <span>Ventana de 24hs expirada — Línea Meta Business</span>
+                        </div>
                         <span style={{
-                            fontSize: '0.75rem', color: '#92400E', fontWeight: 600,
-                            flex: 1,
+                            fontSize: '0.85rem', color: '#A16207', fontWeight: 400,
+                            maxWidth: '90%', lineHeight: '1.4'
                         }}>
-                            Ventana expirada — Solo podés enviar una plantilla de WhatsApp (tiene costo)
+                            Pasaron más de 24hs desde el último mensaje del paciente. Solo podés reanudar la conversación con una plantilla oficial aprobada por Meta. Cuando el paciente responda, se habilitará nuevamente el chat.
                         </span>
-                        <button
-                            onClick={() => {
-                                setInputText('/');
-                                setShowShortcuts(true);
-                                setShortcutFilter('');
-                                setShortcutIndex(0);
-                                inputRef.current?.focus();
-                            }}
-                            style={{
-                                padding: '6px 14px', borderRadius: '8px',
-                                background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                                border: 'none', color: '#fff', cursor: 'pointer',
-                                fontSize: '0.75rem', fontWeight: 700,
-                                boxShadow: '0 2px 6px rgba(217,119,6,0.3)',
-                                transition: 'all 0.15s', whiteSpace: 'nowrap',
-                                display: 'flex', alignItems: 'center', gap: '4px',
-                            }}
-                            onMouseOver={e => e.currentTarget.style.transform = 'scale(1.03)'}
-                            onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
-                        >
-                            <Zap size={13} />
-                            Usar plantilla
-                        </button>
-                    </div>
-                )}
-
-                {/* ===== COMPOSER ===== */}
-                <div style={{
-                    background: '#F0F2F5',
-                    padding: '10px 16px',
-                    display: 'flex', alignItems: 'flex-end', gap: '8px',
-                    borderTop: '1px solid #E9EDEF',
-                }}>
-                    {/* Hidden file input */}
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageSelect}
-                        style={{ display: 'none' }}
-                    />
-
-                    {isRecording ? (
-                        /* Recording UI */
-                        <div style={{
-                            flex: 1, display: 'flex', alignItems: 'center',
-                            gap: '12px', padding: '8px 16px',
-                            background: '#fff', borderRadius: '20px',
-                        }}>
-                            <div style={{
-                                width: '10px', height: '10px', borderRadius: '50%',
-                                background: '#EF4444', animation: 'pulse 1s ease-in-out infinite',
-                            }} />
-                            <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#EF4444', flex: 1 }}>
-                                Grabando {formatRecordingTime(recordingTime)}
-                            </span>
+                        <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
                             <button
-                                onClick={cancelRecording}
-                                title="Cancelar"
-                                style={{
-                                    width: '32px', height: '32px', borderRadius: '50%',
-                                    background: '#FEE2E2', border: 'none', color: '#EF4444',
-                                    cursor: 'pointer', display: 'flex',
-                                    alignItems: 'center', justifyContent: 'center',
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setInputText('/');
+                                    setShowShortcuts(true);
+                                    setShortcutFilter('meta');
+                                    setShortcutIndex(0);
                                 }}
-                            >
-                                <X size={16} />
-                            </button>
-                            <button
-                                onClick={stopRecording}
-                                title="Enviar audio"
                                 style={{
-                                    width: '42px', height: '42px', borderRadius: '50%',
-                                    background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                                    padding: '10px 24px', borderRadius: '8px',
+                                    background: '#10B981',
                                     border: 'none', color: '#fff', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    boxShadow: '0 2px 8px rgba(37,211,102,0.35)',
+                                    fontSize: '0.9rem', fontWeight: 600,
+                                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
+                                    transition: 'all 0.15s', whiteSpace: 'nowrap',
+                                    display: 'flex', alignItems: 'center', gap: '8px',
                                 }}
+                                onMouseOver={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                                onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
                             >
-                                <Send size={18} />
+                                <Zap size={16} />
+                                Enviar Plantilla Oficial
                             </button>
+                            
+                            {/* ===== SHORTCUTS POPUP (Anchored to the button) ===== */}
+                            {showShortcuts && filteredShortcuts.length > 0 && (
+                                <div
+                                    ref={shortcutPopupRef}
+                                    style={{
+                                        position: 'absolute',
+                                        bottom: 'calc(100% + 12px)',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        background: '#fff',
+                                        borderRadius: '12px',
+                                        boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)',
+                                        maxHeight: '260px',
+                                        width: 'min(400px, 90vw)',
+                                        overflowY: 'auto',
+                                        zIndex: 100,
+                                        animation: 'scaleIn 0.15s ease-out',
+                                        textAlign: 'left'
+                                    }}
+                                >
+                                    {/* Header */}
+                                    <div style={{
+                                        padding: '10px 14px 6px',
+                                        borderBottom: '1px solid #f0f0f0',
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                    }}>
+                                        <Zap size={14} style={{ color: '#F59E0B' }} />
+                                        <span style={{
+                                            fontSize: '0.72rem', fontWeight: 700,
+                                            color: '#8696A0', textTransform: 'uppercase',
+                                            letterSpacing: '0.05em',
+                                        }}>
+                                            Atajos rápidos
+                                        </span>
+                                        <span style={{
+                                            fontSize: '0.65rem', color: '#aaa', marginLeft: 'auto',
+                                        }}>
+                                            ↑↓ navegar · Enter seleccionar
+                                        </span>
+                                    </div>
+
+                                    {/* Shortcut items */}
+                                    {filteredShortcuts.map((sc, idx) => (
+                                        <div
+                                            key={sc.id}
+                                            onClick={() => selectShortcut(sc)}
+                                            style={{
+                                                padding: '10px 14px',
+                                                cursor: 'pointer',
+                                                borderBottom: idx < filteredShortcuts.length - 1 ? '1px solid #f5f5f5' : 'none',
+                                                background: idx === shortcutIndex ? '#F0FFF4' : 'transparent',
+                                                transition: 'background 0.1s',
+                                                display: 'flex', flexDirection: 'column', gap: '3px',
+                                            }}
+                                            onMouseEnter={() => setShortcutIndex(idx)}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{
+                                                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                                                    fontSize: '0.78rem', fontWeight: 700,
+                                                    color: '#25D366',
+                                                    background: 'rgba(37,211,102,0.1)',
+                                                    padding: '2px 8px', borderRadius: '6px',
+                                                }}>
+                                                    {sc.shortcut}
+                                                </span>
+                                                <span style={{
+                                                    fontSize: '0.82rem', fontWeight: 600,
+                                                    color: '#111B21',
+                                                }}>
+                                                    {sc.label}
+                                                </span>
+                                                {sc.category && (
+                                                    <span style={{
+                                                        fontSize: '0.65rem', color: '#8696A0',
+                                                        background: '#F0F2F5', padding: '1px 6px',
+                                                        borderRadius: '4px', marginLeft: 'auto',
+                                                    }}>
+                                                        {sc.category}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p style={{
+                                                margin: 0, fontSize: '0.75rem', color: '#667781',
+                                                lineHeight: 1.3,
+                                                overflow: 'hidden', textOverflow: 'ellipsis',
+                                                display: '-webkit-box', WebkitLineClamp: 2,
+                                                WebkitBoxOrient: 'vertical',
+                                            }}>
+                                                {sc.message}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    ) : uploadingMedia ? (
-                        /* Upload indicator */
-                        <div style={{
-                            flex: 1, display: 'flex', alignItems: 'center',
-                            justifyContent: 'center', gap: '8px', padding: '12px',
-                            background: '#fff', borderRadius: '20px',
-                        }}>
-                            <Loader size={18} style={{ animation: 'spin 1s linear infinite', color: '#25D366' }} />
-                            <span style={{ fontSize: '0.85rem', color: '#667781' }}>Enviando...</span>
-                        </div>
-                    ) : (
-                        /* Normal composer */
-                        <>
-                            {/* Emoji toggle */}
-                            <button
-                                onClick={() => setShowEmojis(!showEmojis)}
-                                style={{
-                                    width: '36px', height: '36px', borderRadius: '50%',
-                                    background: showEmojis ? 'rgba(37,211,102,0.15)' : 'none',
-                                    border: 'none',
-                                    color: showEmojis ? '#25D366' : '#54656F',
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center',
-                                    justifyContent: 'center', flexShrink: 0,
-                                    transition: 'all 0.15s',
-                                }}
-                            >
-                                <Smile size={22} />
-                            </button>
+                    </div>
+                ) : (
+                    <div style={{
+                        background: '#F0F2F5',
+                        padding: '10px 16px',
+                        display: 'flex', alignItems: 'flex-end', gap: '8px',
+                        borderTop: '1px solid #E9EDEF',
+                    }}>
+                        {/* Hidden file input */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageSelect}
+                            style={{ display: 'none' }}
+                        />
 
-                            {/* Image button */}
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                style={{
-                                    width: '36px', height: '36px', borderRadius: '50%',
-                                    background: 'none', border: 'none', color: '#54656F',
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center',
-                                    justifyContent: 'center', flexShrink: 0,
-                                }}
-                                title="Enviar imagen"
-                            >
-                                <ImageIcon size={20} />
-                            </button>
+                        {isRecording ? (
+                            /* Recording UI */
+                            <div style={{
+                                flex: 1, display: 'flex', alignItems: 'center',
+                                gap: '12px', padding: '8px 16px',
+                                background: '#fff', borderRadius: '20px',
+                            }}>
+                                <div style={{
+                                    width: '10px', height: '10px', borderRadius: '50%',
+                                    background: '#EF4444', animation: 'pulse 1s ease-in-out infinite',
+                                }} />
+                                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#EF4444', flex: 1 }}>
+                                    Grabando {formatRecordingTime(recordingTime)}
+                                </span>
+                                <button
+                                    onClick={cancelRecording}
+                                    title="Cancelar"
+                                    style={{
+                                        width: '32px', height: '32px', borderRadius: '50%',
+                                        background: '#FEE2E2', border: 'none', color: '#EF4444',
+                                        cursor: 'pointer', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center',
+                                    }}
+                                >
+                                    <X size={16} />
+                                </button>
+                                <button
+                                    onClick={stopRecording}
+                                    title="Enviar audio"
+                                    style={{
+                                        width: '42px', height: '42px', borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                                        border: 'none', color: '#fff', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        boxShadow: '0 2px 8px rgba(37,211,102,0.35)',
+                                    }}
+                                >
+                                    <Send size={18} />
+                                </button>
+                            </div>
+                        ) : uploadingMedia ? (
+                            /* Upload indicator */
+                            <div style={{
+                                flex: 1, display: 'flex', alignItems: 'center',
+                                justifyContent: 'center', gap: '8px', padding: '12px',
+                                background: '#fff', borderRadius: '20px',
+                            }}>
+                                <Loader size={18} style={{ animation: 'spin 1s linear infinite', color: '#25D366' }} />
+                                <span style={{ fontSize: '0.85rem', color: '#667781' }}>Enviando...</span>
+                            </div>
+                        ) : (
+                            /* Normal composer */
+                            <>
+                                {/* Emoji toggle */}
+                                <button
+                                    onClick={() => setShowEmojis(!showEmojis)}
+                                    style={{
+                                        width: '36px', height: '36px', borderRadius: '50%',
+                                        background: showEmojis ? 'rgba(37,211,102,0.15)' : 'none',
+                                        border: 'none',
+                                        color: showEmojis ? '#25D366' : '#54656F',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center',
+                                        justifyContent: 'center', flexShrink: 0,
+                                        transition: 'all 0.15s',
+                                    }}
+                                >
+                                    <Smile size={22} />
+                                </button>
 
-                            {/* Text input + Shortcuts popup */}
-                            <div style={{ flex: 1, position: 'relative' }}>
+                                {/* Image button */}
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    style={{
+                                        width: '36px', height: '36px', borderRadius: '50%',
+                                        background: 'none', border: 'none', color: '#54656F',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center',
+                                        justifyContent: 'center', flexShrink: 0,
+                                    }}
+                                    title="Enviar imagen"
+                                >
+                                    <ImageIcon size={20} />
+                                </button>
 
-                                {/* ===== SHORTCUTS POPUP ===== */}
-                                {showShortcuts && filteredShortcuts.length > 0 && (
-                                    <div
-                                        ref={shortcutPopupRef}
-                                        style={{
+                                {/* Text input + Shortcuts popup */}
+                                <div style={{ flex: 1, position: 'relative' }}>
+
+                                    {/* ===== SHORTCUTS POPUP ===== */}
+                                    {showShortcuts && filteredShortcuts.length > 0 && (
+                                        <div
+                                            ref={shortcutPopupRef}
+                                            style={{
+                                                position: 'absolute',
+                                                bottom: 'calc(100% + 8px)',
+                                                left: 0, right: 0,
+                                                background: '#fff',
+                                                borderRadius: '12px',
+                                                boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)',
+                                                maxHeight: '260px',
+                                                overflowY: 'auto',
+                                                zIndex: 100,
+                                                animation: 'scaleIn 0.15s ease-out',
+                                            }}
+                                        >
+                                            {/* Header */}
+                                            <div style={{
+                                                padding: '10px 14px 6px',
+                                                borderBottom: '1px solid #f0f0f0',
+                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                            }}>
+                                                <Zap size={14} style={{ color: '#F59E0B' }} />
+                                                <span style={{
+                                                    fontSize: '0.72rem', fontWeight: 700,
+                                                    color: '#8696A0', textTransform: 'uppercase',
+                                                    letterSpacing: '0.05em',
+                                                }}>
+                                                    Atajos rápidos
+                                                </span>
+                                                <span style={{
+                                                    fontSize: '0.65rem', color: '#aaa', marginLeft: 'auto',
+                                                }}>
+                                                    ↑↓ navegar · Enter seleccionar
+                                                </span>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setShowShortcutManager(true); setShowShortcuts(false); }}
+                                                    title="Administrar atajos"
+                                                    style={{
+                                                        width: '24px', height: '24px', borderRadius: '6px',
+                                                        background: 'none', border: '1px solid #E2E8F0',
+                                                        color: '#8696A0', cursor: 'pointer',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        transition: 'all 0.15s',
+                                                    }}
+                                                    onMouseOver={e => { e.currentTarget.style.background = '#F0F2F5'; e.currentTarget.style.color = '#25D366'; }}
+                                                    onMouseOut={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#8696A0'; }}
+                                                >
+                                                    <Settings size={12} />
+                                                </button>
+                                            </div>
+
+                                            {/* Shortcut items */}
+                                            {filteredShortcuts.map((sc, idx) => (
+                                                <div
+                                                    key={sc.id}
+                                                    onClick={() => selectShortcut(sc)}
+                                                    style={{
+                                                        padding: '10px 14px',
+                                                        cursor: 'pointer',
+                                                        borderBottom: idx < filteredShortcuts.length - 1 ? '1px solid #f5f5f5' : 'none',
+                                                        background: idx === shortcutIndex ? '#F0FFF4' : 'transparent',
+                                                        transition: 'background 0.1s',
+                                                        display: 'flex', flexDirection: 'column', gap: '3px',
+                                                    }}
+                                                    onMouseEnter={() => setShortcutIndex(idx)}
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{
+                                                            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                                                            fontSize: '0.78rem', fontWeight: 700,
+                                                            color: '#25D366',
+                                                            background: 'rgba(37,211,102,0.1)',
+                                                            padding: '2px 8px', borderRadius: '6px',
+                                                        }}>
+                                                            {sc.shortcut}
+                                                        </span>
+                                                        <span style={{
+                                                            fontSize: '0.82rem', fontWeight: 600,
+                                                            color: '#111B21',
+                                                        }}>
+                                                            {sc.label}
+                                                        </span>
+                                                        {sc.category && (
+                                                            <span style={{
+                                                                fontSize: '0.65rem', color: '#8696A0',
+                                                                background: '#F0F2F5', padding: '1px 6px',
+                                                                borderRadius: '4px', marginLeft: 'auto',
+                                                            }}>
+                                                                {sc.category}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p style={{
+                                                        margin: 0, fontSize: '0.75rem', color: '#667781',
+                                                        lineHeight: 1.3,
+                                                        overflow: 'hidden', textOverflow: 'ellipsis',
+                                                        display: '-webkit-box', WebkitLineClamp: 2,
+                                                        WebkitBoxOrient: 'vertical',
+                                                    }}>
+                                                        {sc.message}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* No results for shortcut filter */}
+                                    {showShortcuts && filteredShortcuts.length === 0 && shortcutFilter && (
+                                        <div style={{
                                             position: 'absolute',
                                             bottom: 'calc(100% + 8px)',
                                             left: 0, right: 0,
                                             background: '#fff',
                                             borderRadius: '12px',
-                                            boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)',
-                                            maxHeight: '260px',
-                                            overflowY: 'auto',
+                                            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                                            padding: '16px',
+                                            textAlign: 'center',
                                             zIndex: 100,
-                                            animation: 'scaleIn 0.15s ease-out',
+                                        }}>
+                                            <p style={{ margin: 0, fontSize: '0.82rem', color: '#8696A0' }}>
+                                                No se encontraron atajos para <strong>/{shortcutFilter}</strong>
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <textarea
+                                        ref={inputRef}
+                                        value={inputText}
+                                        onChange={handleInputChange}
+                                        onKeyDown={handleKeyDown}
+                                        placeholder="Escribí un mensaje... (/ para atajos)"
+                                        rows={1}
+                                        style={{
+                                            width: '100%', resize: 'none',
+                                            padding: '10px 14px',
+                                            borderRadius: '20px', border: 'none',
+                                            fontSize: '0.88rem', outline: 'none',
+                                            background: '#fff',
+                                            maxHeight: '120px', minHeight: '40px',
+                                            lineHeight: 1.4,
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+                                            overflow: 'hidden',
+                                            wordBreak: 'break-word',
+                                        }}
+                                    />
+                                </div>
+
+                                {/* Send or Mic button */}
+                                {inputText.trim() ? (
+                                    <button
+                                        onClick={handleSend}
+                                        disabled={sending}
+                                        style={{
+                                            width: '42px', height: '42px', borderRadius: '50%',
+                                            background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                                            border: 'none', color: '#fff', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            flexShrink: 0, transition: 'all 0.2s',
+                                            boxShadow: '0 2px 8px rgba(37,211,102,0.35)',
                                         }}
                                     >
-                                        {/* Header */}
-                                        <div style={{
-                                            padding: '10px 14px 6px',
-                                            borderBottom: '1px solid #f0f0f0',
-                                            display: 'flex', alignItems: 'center', gap: '6px',
-                                        }}>
-                                            <Zap size={14} style={{ color: '#F59E0B' }} />
-                                            <span style={{
-                                                fontSize: '0.72rem', fontWeight: 700,
-                                                color: '#8696A0', textTransform: 'uppercase',
-                                                letterSpacing: '0.05em',
-                                            }}>
-                                                Atajos rápidos
-                                            </span>
-                                            <span style={{
-                                                fontSize: '0.65rem', color: '#aaa', marginLeft: 'auto',
-                                            }}>
-                                                ↑↓ navegar · Enter seleccionar
-                                            </span>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); setShowShortcutManager(true); setShowShortcuts(false); }}
-                                                title="Administrar atajos"
-                                                style={{
-                                                    width: '24px', height: '24px', borderRadius: '6px',
-                                                    background: 'none', border: '1px solid #E2E8F0',
-                                                    color: '#8696A0', cursor: 'pointer',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    transition: 'all 0.15s',
-                                                }}
-                                                onMouseOver={e => { e.currentTarget.style.background = '#F0F2F5'; e.currentTarget.style.color = '#25D366'; }}
-                                                onMouseOut={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#8696A0'; }}
-                                            >
-                                                <Settings size={12} />
-                                            </button>
-                                        </div>
-
-                                        {/* Shortcut items */}
-                                        {filteredShortcuts.map((sc, idx) => (
-                                            <div
-                                                key={sc.id}
-                                                onClick={() => selectShortcut(sc)}
-                                                style={{
-                                                    padding: '10px 14px',
-                                                    cursor: 'pointer',
-                                                    borderBottom: idx < filteredShortcuts.length - 1 ? '1px solid #f5f5f5' : 'none',
-                                                    background: idx === shortcutIndex ? '#F0FFF4' : 'transparent',
-                                                    transition: 'background 0.1s',
-                                                    display: 'flex', flexDirection: 'column', gap: '3px',
-                                                }}
-                                                onMouseEnter={() => setShortcutIndex(idx)}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span style={{
-                                                        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                                                        fontSize: '0.78rem', fontWeight: 700,
-                                                        color: '#25D366',
-                                                        background: 'rgba(37,211,102,0.1)',
-                                                        padding: '2px 8px', borderRadius: '6px',
-                                                    }}>
-                                                        {sc.shortcut}
-                                                    </span>
-                                                    <span style={{
-                                                        fontSize: '0.82rem', fontWeight: 600,
-                                                        color: '#111B21',
-                                                    }}>
-                                                        {sc.label}
-                                                    </span>
-                                                    {sc.category && (
-                                                        <span style={{
-                                                            fontSize: '0.65rem', color: '#8696A0',
-                                                            background: '#F0F2F5', padding: '1px 6px',
-                                                            borderRadius: '4px', marginLeft: 'auto',
-                                                        }}>
-                                                            {sc.category}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p style={{
-                                                    margin: 0, fontSize: '0.75rem', color: '#667781',
-                                                    lineHeight: 1.3,
-                                                    overflow: 'hidden', textOverflow: 'ellipsis',
-                                                    display: '-webkit-box', WebkitLineClamp: 2,
-                                                    WebkitBoxOrient: 'vertical',
-                                                }}>
-                                                    {sc.message}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
+                                        <Send size={18} style={{ marginLeft: '2px' }} />
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={startRecording}
+                                        style={{
+                                            width: '42px', height: '42px', borderRadius: '50%',
+                                            background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                                            border: 'none', color: '#fff', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            flexShrink: 0, transition: 'all 0.2s',
+                                            boxShadow: '0 2px 8px rgba(37,211,102,0.35)',
+                                        }}
+                                        title="Grabar audio"
+                                    >
+                                        <Mic size={18} />
+                                    </button>
                                 )}
-
-                                {/* No results for shortcut filter */}
-                                {showShortcuts && filteredShortcuts.length === 0 && shortcutFilter && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        bottom: 'calc(100% + 8px)',
-                                        left: 0, right: 0,
-                                        background: '#fff',
-                                        borderRadius: '12px',
-                                        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-                                        padding: '16px',
-                                        textAlign: 'center',
-                                        zIndex: 100,
-                                    }}>
-                                        <p style={{ margin: 0, fontSize: '0.82rem', color: '#8696A0' }}>
-                                            No se encontraron atajos para <strong>/{shortcutFilter}</strong>
-                                        </p>
-                                    </div>
-                                )}
-
-                                <textarea
-                                    ref={inputRef}
-                                    value={inputText}
-                                    onChange={handleInputChange}
-                                    onKeyDown={handleKeyDown}
-                                    placeholder={isWindowExpired ? "⚠️ Ventana expirada — Escribí / para usar una plantilla" : "Escribí un mensaje... (/ para atajos)"}
-                                    rows={1}
-                                    style={{
-                                        width: '100%', resize: 'none',
-                                        padding: '10px 14px',
-                                        borderRadius: '20px', border: 'none',
-                                        fontSize: '0.88rem', outline: 'none',
-                                        background: '#fff',
-                                        maxHeight: '120px', minHeight: '40px',
-                                        lineHeight: 1.4,
-                                        boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                                        overflow: 'hidden',
-                                        wordBreak: 'break-word',
-                                    }}
-                                />
-                            </div>
-
-                            {/* Send or Mic button */}
-                            {inputText.trim() ? (
-                                <button
-                                    onClick={handleSend}
-                                    disabled={sending}
-                                    style={{
-                                        width: '42px', height: '42px', borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
-                                        border: 'none', color: '#fff', cursor: 'pointer',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        flexShrink: 0, transition: 'all 0.2s',
-                                        boxShadow: '0 2px 8px rgba(37,211,102,0.35)',
-                                    }}
-                                >
-                                    <Send size={18} style={{ marginLeft: '2px' }} />
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={startRecording}
-                                    style={{
-                                        width: '42px', height: '42px', borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
-                                        border: 'none', color: '#fff', cursor: 'pointer',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        flexShrink: 0, transition: 'all 0.2s',
-                                        boxShadow: '0 2px 8px rgba(37,211,102,0.35)',
-                                    }}
-                                    title="Grabar audio"
-                                >
+                            </>
+                        )}
+                    </div>
+                )}            >
                                     <Mic size={18} />
                                 </button>
                             )}
@@ -1559,6 +1694,79 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                         >
                             Cancelar
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ===== META TEMPLATE COST MODAL ===== */}
+            {showMetaCostModal && pendingMetaTemplate && (
+                <div style={{
+                    position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10030,
+                    background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                    <div style={{
+                        background: '#fff', borderRadius: '16px', width: 'min(400px, 90vw)',
+                        padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                        animation: 'scaleIn 0.2s ease-out',
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                            <div style={{
+                                width: '40px', height: '40px', borderRadius: '12px',
+                                background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#fff'
+                            }}>
+                                <Zap size={20} />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#1E293B' }}>Enviar Plantilla Oficial</h3>
+                                <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748B' }}>Meta WhatsApp API</p>
+                            </div>
+                        </div>
+
+                        <div style={{
+                            background: '#F8FAFC', border: '1px solid #E2E8F0',
+                            borderRadius: '8px', padding: '12px', marginBottom: '20px'
+                        }}>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: 1.5 }}>
+                                Estás por enviar la plantilla <strong>{pendingMetaTemplate.shortcut}</strong>.
+                                <br/><br/>
+                                ⚠️ El envío de esta plantilla iniciará una ventana de 24hs y tiene un costo en Meta.
+                            </p>
+                            <div style={{
+                                background: '#E2E8F0', padding: '10px', borderRadius: '6px',
+                                marginTop: '12px', fontSize: '0.8rem', color: '#334155', fontStyle: 'italic'
+                            }}>
+                                "{pendingMetaTemplate.message}"
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => { setShowMetaCostModal(false); setPendingMetaTemplate(null); }}
+                                style={{
+                                    padding: '10px 16px', borderRadius: '8px', background: '#F1F5F9',
+                                    border: 'none', color: '#475569', fontWeight: 600, cursor: 'pointer',
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmSendMetaTemplate}
+                                disabled={sendingMetaTemplate}
+                                style={{
+                                    padding: '10px 20px', borderRadius: '8px',
+                                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                    border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    opacity: sendingMetaTemplate ? 0.7 : 1,
+                                }}
+                            >
+                                {sendingMetaTemplate ? <div style={{width:'16px',height:'16px',border:'2px solid #fff',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 1s linear infinite'}}/> : <Send size={16} />}
+                                Enviar y Cobrar
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
