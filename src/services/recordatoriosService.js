@@ -17,12 +17,17 @@ const PAGE_SIZE = 1000;
 // porque el sync-server filtra por tipo_visita en la query SQL.
 // El filtro local es un safety-net por si quedaron datos legacy.
 
-/** Filtra solo filas con tipo_visita CHQ o ECO */
-function soloChequeos(rows) {
+/** Filtra solo filas con tipo_agenda CHQ o ECO */
+function soloChequeos(rows, tipoAgendaFilter) {
     return rows.filter(r => {
-        if (!r.tipo_visita) return false;
-        const tv = r.tipo_visita.toUpperCase();
-        return tv.includes('(CHQ)') || tv.includes('(ECO)');
+        if (!r.tipo_agenda) return false;
+        const ta = r.tipo_agenda.toUpperCase().trim();
+        // Si hay filtro específico, aplicar
+        if (tipoAgendaFilter && tipoAgendaFilter !== 'todos') {
+            return ta === tipoAgendaFilter.toUpperCase();
+        }
+        // Por defecto: solo CHQ y ECO
+        return ta === 'CHQ' || ta === 'ECO';
     });
 }
 
@@ -52,10 +57,10 @@ async function paginateQuery(buildQuery) {
  * @param {string} [options.search] - Búsqueda libre
  * @param {string} [options.centro] - Filtro por centro
  * @param {string} [options.obraSocial] - Filtro por obra social
- * @param {string} [options.asistencia] - Filtro por asistencia
+ * @param {string} [options.tipoAgenda] - Filtro por tipo agenda (CHQ, ECO, todos)
  */
 export async function fetchRecordatorios(options = {}) {
-    const { fechaDesde, fechaHasta, search, centro, obraSocial, asistencia } = options;
+    const { fechaDesde, fechaHasta, search, centro, obraSocial, asistencia, tipoAgenda } = options;
 
     if (!fechaDesde || !fechaHasta) return [];
 
@@ -76,8 +81,8 @@ export async function fetchRecordatorios(options = {}) {
         return query;
     });
 
-    // Filtro de búsqueda local
-    let filtered = soloChequeos(data);
+    // Filtro por tipo_agenda (CHQ/ECO)
+    let filtered = soloChequeos(data, tipoAgenda);
     if (search) {
         const s = search.toLowerCase();
         filtered = filtered.filter(r =>

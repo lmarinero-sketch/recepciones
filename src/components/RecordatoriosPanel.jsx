@@ -33,6 +33,7 @@ export default function RecordatoriosPanel({ addToast }) {
     const [search, setSearch] = useState('');
     const [stats, setStats] = useState({ turnosHoy: 0, turnosFuturos: 0, ausentesAyer: 0 });
     const [filtroAsistencia, setFiltroAsistencia] = useState('');
+    const [tipoAgenda, setTipoAgenda] = useState('todos'); // todos | CHQ | ECO
 
     // Chat
     const [chatOpen, setChatOpen] = useState(false);
@@ -62,6 +63,7 @@ export default function RecordatoriosPanel({ addToast }) {
                     fechaHasta,
                     search: '',
                     asistencia: filtroAsistencia || undefined,
+                    tipoAgenda,
                 }),
                 fetchRecordatoriosStats(),
             ]);
@@ -73,7 +75,7 @@ export default function RecordatoriosPanel({ addToast }) {
         } finally {
             setLoading(false);
         }
-    }, [fechaDesde, fechaHasta, filtroAsistencia, addToast]);
+    }, [fechaDesde, fechaHasta, filtroAsistencia, tipoAgenda, addToast]);
 
     useEffect(() => {
         loadData();
@@ -303,6 +305,21 @@ export default function RecordatoriosPanel({ addToast }) {
                         <option value="">Todas las asistencias</option>
                         <option value="Presente">✅ Presente</option>
                         <option value="Ausente">❌ Ausente</option>
+                    </select>
+
+                    {/* Filtro tipo agenda */}
+                    <select
+                        value={tipoAgenda}
+                        onChange={e => setTipoAgenda(e.target.value)}
+                        style={{
+                            padding: '0 14px', borderRadius: '10px', border: '1px solid #e2e8f0',
+                            fontSize: '0.82rem', fontWeight: 600, color: '#475569', background: '#fff',
+                            cursor: 'pointer', minWidth: '140px',
+                        }}
+                    >
+                        <option value="todos">📋 Todos los tipos</option>
+                        <option value="CHQ">🩺 CHQ — Chequeo</option>
+                        <option value="ECO">🔬 ECO — Ecografía</option>
                     </select>
                 </div>
             </div>
