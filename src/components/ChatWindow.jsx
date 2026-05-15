@@ -1058,143 +1058,91 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                 {/* ===== 24H EXPIRED COMPOSER BLOCKER ===== */}
                 {isWindowExpired && !loading ? (
                     <div style={{
-                        background: '#FFFBEB',
+                        background: 'linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 100%)',
                         padding: '16px 20px',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+                        display: 'flex', flexDirection: 'column', gap: '12px',
                         borderTop: '2px solid #FDE68A',
-                        textAlign: 'center'
                     }}>
+                        {/* Header */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400E', fontWeight: '600' }}>
                             <AlertTriangle size={18} />
-                            <span>Ventana de 24hs expirada — Línea Meta Business</span>
+                            <span style={{ fontSize: '0.85rem' }}>Ventana de 24hs expirada</span>
                         </div>
-                        <span style={{
-                            fontSize: '0.85rem', color: '#A16207', fontWeight: 400,
-                            maxWidth: '90%', lineHeight: '1.4'
-                        }}>
-                            Pasaron más de 24hs desde el último mensaje del paciente. Solo podés reanudar la conversación con una plantilla oficial aprobada por Meta. Cuando el paciente responda, se habilitará nuevamente el chat.
-                        </span>
-                        <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setInputText('/');
-                                    setShowShortcuts(true);
-                                    setShortcutFilter('meta');
-                                    setShortcutIndex(0);
-                                }}
-                                style={{
-                                    padding: '10px 24px', borderRadius: '8px',
-                                    background: '#10B981',
-                                    border: 'none', color: '#fff', cursor: 'pointer',
-                                    fontSize: '0.9rem', fontWeight: 600,
-                                    boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
-                                    transition: 'all 0.15s', whiteSpace: 'nowrap',
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                }}
-                                onMouseOver={e => e.currentTarget.style.transform = 'scale(1.02)'}
-                                onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
-                            >
-                                <Zap size={16} />
-                                Enviar Plantilla Oficial
-                            </button>
-                            
-                            {/* ===== SHORTCUTS POPUP (Anchored to the button) ===== */}
-                            {showShortcuts && filteredShortcuts.length > 0 && (
-                                <div
-                                    ref={shortcutPopupRef}
+
+                        {/* Template Selector */}
+                        {metaTemplates.length > 0 ? (
+                            <>
+                                <select
+                                    value={pendingMetaTemplate ? (pendingMetaTemplate._metaData?.name || pendingMetaTemplate.shortcut || '') : ''}
+                                    onChange={e => {
+                                        const tplName = e.target.value;
+                                        if (!tplName) { setPendingMetaTemplate(null); return; }
+                                        const found = metaAsShortcuts.find(s => (s._metaData?.name || s.shortcut) === tplName);
+                                        setPendingMetaTemplate(found || null);
+                                    }}
                                     style={{
-                                        position: 'absolute',
-                                        bottom: 'calc(100% + 12px)',
-                                        left: '50%',
-                                        transform: 'translateX(-50%)',
-                                        background: '#fff',
-                                        borderRadius: '12px',
-                                        boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05)',
-                                        maxHeight: '260px',
-                                        width: 'min(400px, 90vw)',
-                                        overflowY: 'auto',
-                                        zIndex: 100,
-                                        animation: 'scaleIn 0.15s ease-out',
-                                        textAlign: 'left'
+                                        width: '100%', padding: '10px 12px', borderRadius: '10px',
+                                        border: '1px solid #E2E8F0', fontSize: '0.85rem',
+                                        outline: 'none', background: '#fff', cursor: 'pointer',
+                                        fontWeight: 600, color: '#1e293b',
                                     }}
                                 >
-                                    {/* Header */}
-                                    <div style={{
-                                        padding: '10px 14px 6px',
-                                        borderBottom: '1px solid #f0f0f0',
-                                        display: 'flex', alignItems: 'center', gap: '6px',
-                                    }}>
-                                        <Zap size={14} style={{ color: '#F59E0B' }} />
-                                        <span style={{
-                                            fontSize: '0.72rem', fontWeight: 700,
-                                            color: '#8696A0', textTransform: 'uppercase',
-                                            letterSpacing: '0.05em',
-                                        }}>
-                                            Atajos rápidos
-                                        </span>
-                                        <span style={{
-                                            fontSize: '0.65rem', color: '#aaa', marginLeft: 'auto',
-                                        }}>
-                                            ↑↓ navegar · Enter seleccionar
-                                        </span>
-                                    </div>
-
-                                    {/* Shortcut items */}
-                                    {filteredShortcuts.map((sc, idx) => (
-                                        <div
-                                            key={sc.id}
-                                            onClick={() => selectShortcut(sc)}
-                                            style={{
-                                                padding: '10px 14px',
-                                                cursor: 'pointer',
-                                                borderBottom: idx < filteredShortcuts.length - 1 ? '1px solid #f5f5f5' : 'none',
-                                                background: idx === shortcutIndex ? '#F0FFF4' : 'transparent',
-                                                transition: 'background 0.1s',
-                                                display: 'flex', flexDirection: 'column', gap: '3px',
-                                            }}
-                                            onMouseEnter={() => setShortcutIndex(idx)}
-                                        >
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span style={{
-                                                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                                                    fontSize: '0.78rem', fontWeight: 700,
-                                                    color: '#25D366',
-                                                    background: 'rgba(37,211,102,0.1)',
-                                                    padding: '2px 8px', borderRadius: '6px',
-                                                }}>
-                                                    {sc.shortcut}
-                                                </span>
-                                                <span style={{
-                                                    fontSize: '0.82rem', fontWeight: 600,
-                                                    color: '#111B21',
-                                                }}>
-                                                    {sc.label}
-                                                </span>
-                                                {sc.category && (
-                                                    <span style={{
-                                                        fontSize: '0.65rem', color: '#8696A0',
-                                                        background: '#F0F2F5', padding: '1px 6px',
-                                                        borderRadius: '4px', marginLeft: 'auto',
-                                                    }}>
-                                                        {sc.category}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p style={{
-                                                margin: 0, fontSize: '0.75rem', color: '#667781',
-                                                lineHeight: 1.3,
-                                                overflow: 'hidden', textOverflow: 'ellipsis',
-                                                display: '-webkit-box', WebkitLineClamp: 2,
-                                                WebkitBoxOrient: 'vertical',
-                                            }}>
-                                                {sc.message}
-                                            </p>
-                                        </div>
+                                    <option value="">Seleccioná una plantilla oficial de Meta...</option>
+                                    {metaAsShortcuts.map(sc => (
+                                        <option key={sc.id} value={sc._metaData?.name || sc.shortcut}>
+                                            📋 {sc.label}
+                                        </option>
                                     ))}
-                                </div>
-                            )}
-                        </div>
+                                </select>
+
+                                {/* Preview of selected template */}
+                                {pendingMetaTemplate && (
+                                    <div style={{
+                                        background: '#fff', padding: '12px 14px', borderRadius: '10px',
+                                        border: '1px dashed #CBD5E1',
+                                    }}>
+                                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '6px' }}>
+                                            Vista previa del mensaje
+                                        </div>
+                                        <p style={{
+                                            margin: 0, fontSize: '0.82rem', color: '#334155',
+                                            lineHeight: 1.5, whiteSpace: 'pre-wrap', fontStyle: 'italic',
+                                        }}>
+                                            {pendingMetaTemplate.message}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Send button */}
+                                <button
+                                    onClick={() => {
+                                        if (pendingMetaTemplate) setShowMetaCostModal(true);
+                                    }}
+                                    disabled={!pendingMetaTemplate}
+                                    style={{
+                                        width: '100%', padding: '12px', borderRadius: '10px',
+                                        background: pendingMetaTemplate ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)' : '#CBD5E1',
+                                        border: 'none', color: '#fff', cursor: pendingMetaTemplate ? 'pointer' : 'default',
+                                        fontSize: '0.9rem', fontWeight: 700,
+                                        boxShadow: pendingMetaTemplate ? '0 2px 8px rgba(16,185,129,0.35)' : 'none',
+                                        transition: 'all 0.15s',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                    }}
+                                >
+                                    <Zap size={16} />
+                                    {pendingMetaTemplate ? 'Enviar Plantilla Oficial' : 'Seleccioná una plantilla para continuar'}
+                                </button>
+                            </>
+                        ) : (
+                            <div style={{
+                                background: '#fff', padding: '14px', borderRadius: '10px',
+                                border: '1px solid #E2E8F0', textAlign: 'center',
+                            }}>
+                                <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748B' }}>
+                                    Cargando plantillas de Meta...
+                                </p>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div style={{
