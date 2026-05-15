@@ -54,7 +54,6 @@ export async function fetchRecordatorios(options = {}) {
         let query = supabase
             .from('recepciones_visitas')
             .select('*')
-            .or(TIPO_VISITA_FILTER)
             .gte('fecha', fechaDesde)
             .lte('fecha', fechaHasta)
             .order('fecha', { ascending: true })
@@ -92,7 +91,6 @@ export async function fetchRecordatoriosStats() {
     const { count: turnosHoy } = await supabase
         .from('recepciones_visitas')
         .select('id', { count: 'exact', head: true })
-        .or(TIPO_VISITA_FILTER)
         .eq('fecha', hoy);
 
     // Turnos futuros (desde mañana)
@@ -103,7 +101,6 @@ export async function fetchRecordatoriosStats() {
     const { count: turnosFuturos } = await supabase
         .from('recepciones_visitas')
         .select('id', { count: 'exact', head: true })
-        .or(TIPO_VISITA_FILTER)
         .gte('fecha', mananaStr);
 
     // Ausentes de ayer
@@ -114,7 +111,6 @@ export async function fetchRecordatoriosStats() {
     const { count: ausentesAyer } = await supabase
         .from('recepciones_visitas')
         .select('id', { count: 'exact', head: true })
-        .or(TIPO_VISITA_FILTER)
         .eq('fecha', ayerStr)
         .eq('asistencia', 'Ausente');
 
@@ -168,7 +164,6 @@ export async function fetchRecordatoriosMetrics(onProgress) {
         supabase
             .from('recepciones_visitas')
             .select('*')
-            .or(TIPO_VISITA_FILTER)
             .order('fecha', { ascending: true })
             .range(from, to)
     );
