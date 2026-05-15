@@ -37,11 +37,13 @@ CREATE INDEX IF NOT EXISTS idx_recv_asistencia ON recepciones_visitas(fecha, asi
 -- RLS: permitir lectura a todos los autenticados
 ALTER TABLE recepciones_visitas ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Permitir lectura recepciones_visitas"
+DROP POLICY IF EXISTS "Permitir lectura recepciones_visitas" ON recepciones_visitas;
+CREATE POLICY "Permitir lectura recepciones_visitas"
     ON recepciones_visitas FOR SELECT
     USING (true);
 
-CREATE POLICY IF NOT EXISTS "Permitir todo service_role recepciones_visitas"
+DROP POLICY IF EXISTS "Permitir todo service_role recepciones_visitas" ON recepciones_visitas;
+CREATE POLICY "Permitir todo service_role recepciones_visitas"
     ON recepciones_visitas FOR ALL
     USING (true)
     WITH CHECK (true);

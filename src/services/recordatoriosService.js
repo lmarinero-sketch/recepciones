@@ -148,3 +148,33 @@ export async function fetchRecordatoriosObrasSociales() {
     }
     return [];
 }
+
+/**
+ * Obtiene TODOS los datos de recepciones_visitas para métricas.
+ * Aplica regla de negocio: si asistencia es null y fecha < hoy → Ausente.
+ */
+export async function fetchRecordatoriosMetrics(onProgress) {
+    onProgress?.('Descargando turnos de chequeos...');
+
+    const data = await paginateQuery((from, to) =>
+        supabase
+            .from('recepciones_visitas')
+            .select('*')
+            .order('fecha', { ascending: true })
+            .range(from, to)
+    );
+
+    onProgress?.(`Procesando ${data.length} registros...`);
+
+    const hoy = new Date().toISOString().split('T')[0];
+
+    // Aplicar regla: null + pasado = Ausente
+    const processed = data.map(row => ({
+        ...row,
+        asistencia_efectiva: row.asistencia
+            ? row.asistencia
+            : (row.fecha && row.fecha < hoy ? 'Ausente' : null),
+    }));
+
+    return processed;
+}
