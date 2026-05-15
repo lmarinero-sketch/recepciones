@@ -15,7 +15,16 @@ const PAGE_SIZE = 1000;
 
 // NOTA: La tabla recepciones_visitas ya contiene SOLO turnos CHQ/ECO
 // porque el sync-server filtra por tipo_visita en la query SQL.
-// No necesitamos re-filtrar en el frontend.
+// El filtro local es un safety-net por si quedaron datos legacy.
+
+/** Filtra solo filas con tipo_visita CHQ o ECO */
+function soloChequeos(rows) {
+    return rows.filter(r => {
+        if (!r.tipo_visita) return false;
+        const tv = r.tipo_visita.toUpperCase();
+        return tv.includes('(CHQ)') || tv.includes('(ECO)');
+    });
+}
 
 /**
  * Paginación genérica para superar el límite de 1000 filas.
@@ -68,9 +77,10 @@ export async function fetchRecordatorios(options = {}) {
     });
 
     // Filtro de búsqueda local
+    let filtered = soloChequeos(data);
     if (search) {
         const s = search.toLowerCase();
-        return data.filter(r =>
+        filtered = filtered.filter(r =>
             (r.paciente && r.paciente.toLowerCase().includes(s)) ||
             (r.dni && r.dni.includes(s)) ||
             (r.telefono1 && r.telefono1.includes(s)) ||
@@ -78,7 +88,7 @@ export async function fetchRecordatorios(options = {}) {
         );
     }
 
-    return data;
+    return filtered;
 }
 
 /**
@@ -86,39 +96,29 @@ export async function fetchRecordatorios(options = {}) {
  */
 export async function fetchRecordatoriosStats() {
     const hoy = new Date().toISOString().split('T')[0];
-
-    // Turnos de hoy
-    const { count: turnosHoy } = await supabase
-        .from('recepciones_visitas')
-        .select('id', { count: 'exact', head: true })
-        .eq('fecha', hoy);
-
-    // Turnos futuros (desde mañana)
     const manana = new Date();
     manana.setDate(manana.getDate() + 1);
     const mananaStr = manana.toISOString().split('T')[0];
-
-    const { count: turnosFuturos } = await supabase
-        .from('recepciones_visitas')
-        .select('id', { count: 'exact', head: true })
-        .gte('fecha', mananaStr);
-
-    // Ausentes de ayer
     const ayer = new Date();
     ayer.setDate(ayer.getDate() - 1);
     const ayerStr = ayer.toISOString().split('T')[0];
 
-    const { count: ausentesAyer } = await supabase
-        .from('recepciones_visitas')
-        .select('id', { count: 'exact', head: true })
-        .eq('fecha', ayerStr)
-        .eq('asistencia', 'Ausente');
+    // Traer todos los datos recientes para filtrar por tipo_visita localmente
+    const allData = await paginateQuery((from, to) =>
+        supabase
+            .from('recepciones_visitas')
+            .select('fecha, asistencia, tipo_visita')
+            .gte('fecha', ayerStr)
+            .range(from, to)
+    );
 
-    return {
-        turnosHoy: turnosHoy || 0,
-        turnosFuturos: turnosFuturos || 0,
-        ausentesAyer: ausentesAyer || 0,
-    };
+    const chq = soloChequeos(allData);
+
+    const turnosHoy = chq.filter(r => r.fecha === hoy).length;
+    const turnosFuturos = chq.filter(r => r.fecha >= mananaStr).length;
+    const ausentesAyer = chq.filter(r => r.fecha === ayerStr && r.asistencia === 'Ausente').length;
+
+    return { turnosHoy, turnosFuturos, ausentesAyer };
 }
 
 /**
@@ -168,12 +168,12 @@ export async function fetchRecordatoriosMetrics(onProgress) {
             .range(from, to)
     );
 
-    onProgress?.(`Procesando ${data.length} registros...`);
+    const chqData = soloChequeos(data);
+    onProgress?.(`Procesando ${chqData.length} chequeos de ${data.length} registros...`);
 
     const hoy = new Date().toISOString().split('T')[0];
 
-    // Aplicar regla: null + pasado = Ausente
-    const processed = data.map(row => ({
+    const processed = chqData.map(row => ({
         ...row,
         asistencia_efectiva: row.asistencia
             ? row.asistencia
