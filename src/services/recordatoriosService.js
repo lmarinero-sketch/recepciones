@@ -17,17 +17,13 @@ const PAGE_SIZE = 1000;
 // porque el sync-server filtra por tipo_visita en la query SQL.
 // El filtro local es un safety-net por si quedaron datos legacy.
 
-/** Filtra solo filas con tipo_agenda CHQ o ECO */
-function soloChequeos(rows, tipoAgendaFilter) {
+/** Filtra por tipo_agenda si se especifica un filtro */
+function filtrarPorTipoAgenda(rows, tipoAgendaFilter) {
+    // Si no hay filtro o es 'todos', devolver todo (la tabla ya está pre-filtrada por el sync)
+    if (!tipoAgendaFilter || tipoAgendaFilter === 'todos') return rows;
     return rows.filter(r => {
         if (!r.tipo_agenda) return false;
-        const ta = r.tipo_agenda.toUpperCase().trim();
-        // Si hay filtro específico, aplicar
-        if (tipoAgendaFilter && tipoAgendaFilter !== 'todos') {
-            return ta === tipoAgendaFilter.toUpperCase();
-        }
-        // Por defecto: solo CHQ y ECO
-        return ta === 'CHQ' || ta === 'ECO';
+        return r.tipo_agenda.toUpperCase().trim() === tipoAgendaFilter.toUpperCase();
     });
 }
 
@@ -82,7 +78,7 @@ export async function fetchRecordatorios(options = {}) {
     });
 
     // Filtro por tipo_agenda (CHQ/ECO)
-    let filtered = soloChequeos(data, tipoAgenda);
+    let filtered = filtrarPorTipoAgenda(data, tipoAgenda);
     if (search) {
         const s = search.toLowerCase();
         filtered = filtered.filter(r =>
@@ -117,7 +113,7 @@ export async function fetchRecordatoriosStats() {
             .range(from, to)
     );
 
-    const chq = soloChequeos(allData);
+    const chq = filtrarPorTipoAgenda(allData);
 
     const turnosHoy = chq.filter(r => r.fecha === hoy).length;
     const turnosFuturos = chq.filter(r => r.fecha >= mananaStr).length;
@@ -138,6 +134,22 @@ export async function fetchRecordatoriosCentros() {
 
     if (data) {
         return [...new Set(data.map(d => d.centro).filter(Boolean))].sort();
+    }
+    return [];
+}
+
+/**
+ * Obtiene los tipos de agenda distintos en recepciones_visitas
+ */
+export async function fetchTiposAgenda() {
+    const { data } = await supabase
+        .from('recepciones_visitas')
+        .select('tipo_agenda')
+        .not('tipo_agenda', 'is', null)
+        .limit(5000);
+
+    if (data) {
+        return [...new Set(data.map(d => d.tipo_agenda).filter(Boolean))].sort();
     }
     return [];
 }
@@ -173,7 +185,7 @@ export async function fetchRecordatoriosMetrics(onProgress) {
             .range(from, to)
     );
 
-    const chqData = soloChequeos(data);
+    const chqData = filtrarPorTipoAgenda(data);
     onProgress?.(`Procesando ${chqData.length} chequeos de ${data.length} registros...`);
 
     const hoy = new Date().toISOString().split('T')[0];

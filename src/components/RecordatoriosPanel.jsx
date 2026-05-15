@@ -10,6 +10,7 @@ import {
     fetchRecordatoriosStats,
     fetchRecordatoriosCentros,
     fetchRecordatoriosObrasSociales,
+    fetchTiposAgenda,
 } from '../services/recordatoriosService';
 import ChatWindow from './ChatWindow';
 
@@ -33,7 +34,8 @@ export default function RecordatoriosPanel({ addToast }) {
     const [search, setSearch] = useState('');
     const [stats, setStats] = useState({ turnosHoy: 0, turnosFuturos: 0, ausentesAyer: 0 });
     const [filtroAsistencia, setFiltroAsistencia] = useState('');
-    const [tipoAgenda, setTipoAgenda] = useState('todos'); // todos | CHQ | ECO
+    const [tipoAgenda, setTipoAgenda] = useState('todos');
+    const [tiposAgendaList, setTiposAgendaList] = useState([]);
 
     // Chat
     const [chatOpen, setChatOpen] = useState(false);
@@ -80,6 +82,14 @@ export default function RecordatoriosPanel({ addToast }) {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Cargar tipos de agenda al montar
+    useEffect(() => {
+        fetchTiposAgenda().then(tipos => {
+            console.log('Tipos de agenda encontrados:', tipos);
+            setTiposAgendaList(tipos);
+        });
+    }, []);
 
     // Filtro de búsqueda local
     const filtered = useMemo(() => {
@@ -318,8 +328,9 @@ export default function RecordatoriosPanel({ addToast }) {
                         }}
                     >
                         <option value="todos">📋 Todos los tipos</option>
-                        <option value="CHQ">🩺 CHQ — Chequeo</option>
-                        <option value="ECO">🔬 ECO — Ecografía</option>
+                        {tiposAgendaList.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                        ))}
                     </select>
                 </div>
             </div>
