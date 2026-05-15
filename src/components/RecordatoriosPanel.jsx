@@ -34,7 +34,7 @@ export default function RecordatoriosPanel({ addToast }) {
     const [search, setSearch] = useState('');
     const [stats, setStats] = useState({ turnosHoy: 0, turnosFuturos: 0, ausentesAyer: 0 });
     const [filtroAsistencia, setFiltroAsistencia] = useState('');
-    const [tipoAgenda, setTipoAgenda] = useState('todos');
+    const [tipoAgenda, setTipoAgenda] = useState('CHEQUEO');
     const [tiposAgendaList, setTiposAgendaList] = useState([]);
 
     // Chat
