@@ -13,8 +13,9 @@ import { supabase } from '../lib/supabase';
 
 const PAGE_SIZE = 1000;
 
-// Filtro obligatorio: solo turnos de chequeo (CHQ/ECO)
-const TIPO_VISITA_FILTER = 'tipo_visita.ilike.%(CHQ)%,tipo_visita.ilike.%(ECO)%';
+// NOTA: La tabla recepciones_visitas ya contiene SOLO turnos CHQ/ECO
+// porque el sync-server filtra por tipo_visita en la query SQL.
+// No necesitamos re-filtrar en el frontend.
 
 /**
  * Paginación genérica para superar el límite de 1000 filas.
