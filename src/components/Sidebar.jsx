@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
     Settings, PanelLeftClose, PanelLeft,
     ChevronDown, Home, MessageSquareText, MessageCircle,
-    Brain, HeartPulse, RefreshCw, BarChart3,
+    Brain, HeartPulse, RefreshCw, BarChart3, Bell,
 } from 'lucide-react';
 
 export default function Sidebar({ collapsed, onToggle, activeView, onViewChange, unreadMessageCount = 0 }) {
@@ -17,7 +17,8 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
     const isMensajeriaActive = mensajeriaSubItems.some(i => activeView === i.id);
 
     const preventivaSubItems = [
-        { id: 'chequeos', label: 'Chequeos', icon: HeartPulse },
+        { id: 'chequeos', label: 'Marketing', icon: HeartPulse },
+        { id: 'recordatorios', label: 'Recordatorios', icon: Bell },
         { id: 'remarketing', label: 'Remarketing', icon: RefreshCw },
         { id: 'metricas', label: 'Métricas', icon: BarChart3 },
     ];

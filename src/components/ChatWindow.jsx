@@ -1430,13 +1430,7 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                             </>
                         )}
                     </div>
-                )}            >
-                                    <Mic size={18} />
-                                </button>
-                            )}
-                        </>
-                    )}
-                </div>
+                )}
             </div>
 
             {/* ===== IMAGE LIGHTBOX ===== */}

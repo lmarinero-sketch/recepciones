@@ -15,6 +15,7 @@ import ChequeoPanel from './components/ChequeoPanel.jsx';
 import ConfigPanel from './components/ConfigPanel.jsx';
 import RemarketingPanel from './components/RemarketingPanel.jsx';
 import MetricasChequeoPanel from './components/MetricasChequeoPanel.jsx';
+import RecordatoriosPanel from './components/RecordatoriosPanel.jsx';
 import './App.css';
 
 function AppRoot() {
@@ -134,7 +135,7 @@ function App({ currentUser, onLogout }) {
                 <header className="topbar no-print" style={{ flexShrink: 0 }}>
                     <div className="topbar__left">
                         <h1 className="topbar__title"><span className="topbar__title-accent">Recepciones</span> Sanatorio Argentino</h1>
-                        <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'remarketing' ? 'Remarketing — Seguimiento' : activeView === 'metricas' ? 'Métricas de Chequeos' : 'Centro de Mensajería'}</span>
+                        <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Marketing — Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'remarketing' ? 'Remarketing — Seguimiento' : activeView === 'metricas' ? 'Métricas de Chequeos' : activeView === 'recordatorios' ? 'Recordatorios de Turnos' : 'Centro de Mensajería'}</span>
                     </div>
                     
                     {/* WhatsAppLineStatus removido — sistema unificado a una sola cuenta BuilderBot */}
@@ -217,6 +218,10 @@ function App({ currentUser, onLogout }) {
 
                 {activeView === 'remarketing' && (
                     <RemarketingPanel addToast={addToast} />
+                )}
+
+                {activeView === 'recordatorios' && (
+                    <RecordatoriosPanel addToast={addToast} />
                 )}
 
                 {activeView === 'metricas' && (
