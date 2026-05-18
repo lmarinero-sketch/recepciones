@@ -465,37 +465,51 @@ export default function MessagingPanel({ addToast }) {
     }, [messageText, selectedPhone, sending, addToast, assignedLineId]);
 
     // ==========================================
-    // SEND IMAGE
+    // SEND MEDIA (IMAGE, VIDEO, PDF)
     // ==========================================
-    const handleImageSelect = async (e) => {
+    const handleMediaSelect = async (e) => {
         const file = e.target.files?.[0];
         if (!file || !selectedPhone) return;
         if (fileInputRef.current) fileInputRef.current.value = '';
-        if (!file.type.startsWith('image/')) {
-            addToast?.('Solo se aceptan imágenes', 'error');
+        
+        const isImage = file.type.startsWith('image/');
+        const isVideo = file.type.startsWith('video/');
+        const isPdf = file.type === 'application/pdf';
+
+        if (!isImage && !isVideo && !isPdf) {
+            addToast?.('Solo se aceptan imágenes, videos y PDF', 'error');
             return;
         }
-        if (file.size > 10 * 1024 * 1024) {
-            addToast?.('Máximo 10MB', 'error');
+
+        if (file.size > 15 * 1024 * 1024) { // Increased to 15MB for video/pdf
+            addToast?.('Máximo 15MB', 'error');
             return;
         }
+        
+        let folder = 'images';
+        let mediaType = 'image';
+        let contentIcon = '📷 Imagen';
+        
+        if (isVideo) { folder = 'videos'; mediaType = 'video'; contentIcon = '🎥 Video'; }
+        if (isPdf) { folder = 'documents'; mediaType = 'document'; contentIcon = '📄 Documento PDF'; }
+
         setUploadingMedia(true);
         try {
-            const mediaUrl = await uploadMedia(file, 'images');
-            await sendWhatsAppMessage({ content: messageText.trim() || '📷 Imagen', number: selectedPhone, mediaUrl, lineId: assignedLineId });
+            const mediaUrl = await uploadMedia(file, folder);
+            await sendWhatsAppMessage({ content: messageText.trim() || contentIcon, number: selectedPhone, mediaUrl, lineId: assignedLineId });
             await saveOutgoingMessage({
                 phone: selectedPhone,
-                content: messageText.trim() || '📷 Imagen',
-                mediaType: 'image',
+                content: messageText.trim() || contentIcon,
+                mediaType,
                 mediaUrl,
                 lineId: assignedLineId,
             });
             // Realtime se encarga de agregar al state
             setMessageText('');
-            addToast?.('Imagen enviada', 'success');
+            addToast?.('Archivo enviado', 'success');
         } catch (err) {
-            console.error('Error sending image:', err);
-            addToast?.('Error enviando imagen', 'error');
+            console.error('Error sending media:', err);
+            addToast?.('Error enviando archivo', 'error');
         } finally {
             setUploadingMedia(false);
         }
@@ -1277,10 +1291,10 @@ export default function MessagingPanel({ addToast }) {
                                     <button className="msg-panel__btn-icon" onClick={() => setShowEmoji(prev => !prev)} title="Emojis">
                                         <Smile size={18} />
                                     </button>
-                                    <button className="msg-panel__btn-icon" onClick={() => fileInputRef.current?.click()} title="Enviar imagen" disabled={uploadingMedia}>
+                                    <button className="msg-panel__btn-icon" onClick={() => fileInputRef.current?.click()} title="Enviar archivo (Imagen, Video, PDF)" disabled={uploadingMedia}>
                                         {uploadingMedia ? <Loader size={18} className="msg-panel__spinner" /> : <Paperclip size={18} />}
                                     </button>
-                                    <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
+                                    <input type="file" ref={fileInputRef} accept="image/*,video/*,application/pdf" onChange={handleMediaSelect} style={{ display: 'none' }} />
                                     <textarea
                                         ref={inputRef}
                                         className="msg-panel__composer-input"

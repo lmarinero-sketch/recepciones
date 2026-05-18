@@ -313,47 +313,57 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     }, [inputText, sending, patientPhone, addToast, assignedLineId, isWindowExpired]);
 
     // ==========================================
-    // ENVIAR IMAGEN
+    // ENVIAR MEDIA (IMAGEN, VIDEO, PDF)
     // ==========================================
-    const handleImageSelect = async (e) => {
+    const handleMediaSelect = async (e) => {
         const file = e.target.files?.[0];
         if (!file || !patientPhone) return;
 
         // Reset file input
         if (fileInputRef.current) fileInputRef.current.value = '';
 
-        // Validar tipo y tamaño
-        if (!file.type.startsWith('image/')) {
-            addToast?.('Solo se aceptan imágenes', 'error');
+        const isImage = file.type.startsWith('image/');
+        const isVideo = file.type.startsWith('video/');
+        const isPdf = file.type === 'application/pdf';
+
+        if (!isImage && !isVideo && !isPdf) {
+            addToast?.('Solo se aceptan imágenes, videos y PDF', 'error');
             return;
         }
-        if (file.size > 10 * 1024 * 1024) {
-            addToast?.('La imagen no puede superar 10MB', 'error');
+        if (file.size > 15 * 1024 * 1024) {
+            addToast?.('El archivo no puede superar 15MB', 'error');
             return;
         }
 
+        let folder = 'images';
+        let mediaType = 'image';
+        let contentIcon = '📷 Imagen';
+        
+        if (isVideo) { folder = 'videos'; mediaType = 'video'; contentIcon = '🎥 Video'; }
+        if (isPdf) { folder = 'documents'; mediaType = 'document'; contentIcon = '📄 Documento PDF'; }
+
         setUploadingMedia(true);
         try {
-            const mediaUrl = await uploadMedia(file, 'images');
+            const mediaUrl = await uploadMedia(file, folder);
             await sendWhatsAppMessage({
-                content: inputText.trim() || '📷 Imagen',
+                content: inputText.trim() || contentIcon,
                 number: patientPhone,
                 mediaUrl,
                 lineId: assignedLineId,
             });
             await saveOutgoingMessage({
                 phone: patientPhone,
-                content: inputText.trim() || '📷 Imagen',
-                mediaType: 'image',
+                content: inputText.trim() || contentIcon,
+                mediaType,
                 mediaUrl,
                 lineId: assignedLineId,
             });
             // Realtime se encarga de agregar al state
             setInputText('');
-            addToast?.('Imagen enviada', 'success');
+            addToast?.('Archivo enviado', 'success');
         } catch (err) {
-            console.error('Error sending image:', err);
-            addToast?.('Error enviando imagen', 'error');
+            console.error('Error sending media:', err);
+            addToast?.('Error enviando archivo', 'error');
         } finally {
             setUploadingMedia(false);
         }
@@ -1155,8 +1165,8 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept="image/*"
-                            onChange={handleImageSelect}
+                            accept="image/*,video/*,application/pdf"
+                            onChange={handleMediaSelect}
                             style={{ display: 'none' }}
                         />
 
@@ -1238,9 +1248,9 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                                         cursor: 'pointer', display: 'flex', alignItems: 'center',
                                         justifyContent: 'center', flexShrink: 0,
                                     }}
-                                    title="Enviar imagen"
+                                    title="Enviar archivo (Imagen, Video, PDF)"
                                 >
-                                    <ImageIcon size={20} />
+                                    <Paperclip size={20} />
                                 </button>
 
                                 {/* Text input + Shortcuts popup */}
