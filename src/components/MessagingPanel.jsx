@@ -736,10 +736,18 @@ export default function MessagingPanel({ addToast }) {
                 components,
             });
             // Guardar como mensaje saliente en la BD para que aparezca en el chat
+            // Extraer botones del template para renderizar en el frontend
+            const templateButtons = (pendingMetaTemplate._metaData?.components || [])
+                .filter(c => c.type === 'BUTTONS')
+                .flatMap(c => c.buttons || [])
+                .map(b => b.text)
+                .filter(Boolean);
+
             await saveOutgoingMessage({
                 phone: selectedPhone,
                 content: `📋 [Plantilla Meta] ${templateName}: ${pendingMetaTemplate.message}`,
                 lineId: 'line_recepciones',
+                rawPayload: templateButtons.length > 0 ? { templateButtons } : undefined,
             });
             addToast?.(`Plantilla "${templateName}" enviada`, 'success');
         } catch (err) {
@@ -934,8 +942,25 @@ export default function MessagingPanel({ addToast }) {
                         <span>{msg.content || 'Documento adjunto'}</span>
                     </a>
                 );
-            default:
+            default: {
+                // Detectar si es un mensaje de plantilla Meta con botones
+                const buttons = msg.raw_payload?.templateButtons;
+                if (buttons && buttons.length > 0) {
+                    // Extraer el texto limpio (sin el prefijo 📋 [Plantilla Meta] name:)
+                    const cleanContent = (msg.content || '').replace(/^📋\s*\[Plantilla Meta\]\s*\S+:\s*/, '');
+                    return (
+                        <div className="msg-panel__template-msg">
+                            <p className="msg-panel__bubble-text">{cleanContent || msg.content}</p>
+                            <div className="msg-panel__template-buttons">
+                                {buttons.map((btn, i) => (
+                                    <span key={i} className="msg-panel__template-btn">{btn}</span>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
                 return <p className="msg-panel__bubble-text">{msg.content}</p>;
+            }
         }
     };
 

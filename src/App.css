@@ -2353,6 +2353,30 @@
     white-space: pre-wrap;
 }
 
+/* Template message with buttons */
+.msg-panel__template-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.msg-panel__template-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 14px;
+    border-radius: 16px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.06);
+    color: #1a73e8;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+}
+
 .msg-panel__bubble-time {
     display: block;
     text-align: right;

@@ -603,11 +603,19 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                 components,
             });
             // Guardar como mensaje saliente en la BD para que aparezca en el chat
+            // Extraer botones del template para renderizar en el frontend
+            const templateButtons = (pendingMetaTemplate._metaData?.components || [])
+                .filter(c => c.type === 'BUTTONS')
+                .flatMap(c => c.buttons || [])
+                .map(b => b.text)
+                .filter(Boolean);
+
             const newLineId = currentLine?.id || 'line_recepciones';
             await saveOutgoingMessage({
                 phone: patientPhone,
                 content: `📋 [Plantilla Meta] ${templateName}: ${pendingMetaTemplate.message}`,
                 lineId: newLineId,
+                rawPayload: templateButtons.length > 0 ? { templateButtons } : undefined,
             });
             
             // Refrescar mensajes
@@ -834,8 +842,33 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                         </span>
                     </a>
                 );
-            default: // text
+            default: {
+                // Detectar si es un mensaje de plantilla Meta con botones
+                const buttons = msg.raw_payload?.templateButtons;
+                if (buttons && buttons.length > 0) {
+                    const cleanContent = (msg.content || '').replace(/^📋\s*\[Plantilla Meta\]\s*\S+:\s*/, '');
+                    return (
+                        <div>
+                            <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{cleanContent || msg.content}</p>
+                            <div style={{
+                                display: 'flex', flexWrap: 'wrap', gap: '6px',
+                                marginTop: '10px', paddingTop: '8px',
+                                borderTop: '1px solid rgba(255,255,255,0.2)',
+                            }}>
+                                {buttons.map((btn, i) => (
+                                    <span key={i} style={{
+                                        padding: '5px 14px', borderRadius: '16px',
+                                        fontSize: '0.78rem', fontWeight: 500,
+                                        background: 'rgba(255,255,255,0.2)',
+                                        color: 'inherit', whiteSpace: 'nowrap',
+                                    }}>{btn}</span>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
                 return <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{msg.content}</p>;
+            }
         }
     };
 

@@ -154,22 +154,26 @@ export async function fetchUnreadCounts() {
 /**
  * Guarda un mensaje saliente en la tabla (cuando enviamos desde el panel)
  */
-export async function saveOutgoingMessage({ phone, content, mediaUrl, mediaType, lineId }) {
+export async function saveOutgoingMessage({ phone, content, mediaUrl, mediaType, lineId, rawPayload }) {
     const normalized = normalizeArgentinePhone(phone);
     if (!normalized) return null;
 
+    const insertData = {
+        phone: normalized,
+        direction: 'outgoing',
+        content: content || '',
+        media_url: mediaUrl || null,
+        media_type: mediaType || 'text',
+        sender_name: 'Recepciones',
+        is_read: true,
+        line_id: lineId || 'line_recepciones',
+    };
+    // Persist template metadata (buttons, etc.) if available
+    if (rawPayload) insertData.raw_payload = rawPayload;
+
     const { data, error } = await supabase
         .from('whatsapp_messages')
-        .insert({
-            phone: normalized,
-            direction: 'outgoing',
-            content: content || '',
-            media_url: mediaUrl || null,
-            media_type: mediaType || 'text',
-            sender_name: 'Recepciones',
-            is_read: true,
-            line_id: lineId || 'line_recepciones',
-        })
+        .insert(insertData)
         .select()
         .single();
 
