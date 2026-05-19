@@ -112,10 +112,10 @@ Deno.serve(async (req) => {
             const config = await getBuilderBotConfig(lineId || 'line_recepciones');
             const url = `https://app.builderbot.cloud/api/v2/${config.projectId}/whatsapp-template`;
 
-            // Normalizar components: Meta API requiere types en UPPERCASE
+            // Normalizar components: BuilderBot API requiere types en lowercase
             const normalizedComponents = (components || []).map((c: any) => ({
                 ...c,
-                type: (c.type || '').toUpperCase(),
+                type: (c.type || '').toLowerCase(),
             }));
 
             const body: any = {

@@ -111,10 +111,10 @@ async function fetchMetaTemplatesDirect(apiKey, projectId) {
  * @returns {Promise<Object>} — Respuesta de la API
  */
 export async function sendMetaTemplate({ to, templateName, languageCode = 'es', components = [] }) {
-    // Normalizar type de components a UPPERCASE como requiere Meta API
+    // Normalizar type de components a lowercase como requiere BuilderBot API
     const normalizedComponents = components.map(c => ({
         ...c,
-        type: (c.type || '').toUpperCase(), // 'body' → 'BODY'
+        type: (c.type || '').toLowerCase(), // 'BODY' → 'body'
     }));
 
     // Intentar via Edge Function (proxy sin CORS)
