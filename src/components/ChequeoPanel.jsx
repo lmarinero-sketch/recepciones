@@ -261,19 +261,27 @@ export default function ChequeoPanel({ addToast }) {
             const normalizedPhone = normalizeArgentinePhone(p.telefono1);
 
             try {
+                // Detectar si la plantilla tiene variables {{N}} en el body
+                const bodyComponent = selectedMetaTemplate.components?.find(c => c.type === 'BODY');
+                const bodyText = bodyComponent?.text || selectedMetaTemplate.body || selectedMetaTemplate.text || '';
+                const hasBodyVariables = /\{\{\d+\}\}/.test(bodyText);
+
+                // Solo enviar components si la plantilla tiene variables
+                const components = hasBodyVariables ? [
+                    {
+                        type: 'BODY',
+                        parameters: [
+                            { type: 'text', text: nombre }
+                        ]
+                    }
+                ] : [];
+
                 // Enviar plantilla Meta seleccionada
                 await sendMetaTemplate({
                     to: normalizedPhone,
                     templateName: templateName,
                     languageCode: languageCode,
-                    components: [
-                        {
-                            type: 'body',
-                            parameters: [
-                                { type: 'text', text: nombre }
-                            ]
-                        }
-                    ],
+                    components,
                 });
 
                 // Registrar el mensaje enviado en la base de datos

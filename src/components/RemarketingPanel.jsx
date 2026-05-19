@@ -96,7 +96,7 @@ export default function RemarketingPanel({ addToast }) {
                 to: phone,
                 templateName: 'captar_clientes',
                 languageCode: 'es_AR',
-                components: [{ type: 'body', parameters: [{ type: 'text', text: nombre }] }],
+                components: [{ type: 'BODY', parameters: [{ type: 'text', text: nombre }] }],
             });
             await saveOutgoingMessage({
                 phone, content: `📋 [Recordatorio] Plantilla enviada a ${nombre}`,

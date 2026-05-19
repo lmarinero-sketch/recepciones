@@ -112,16 +112,23 @@ Deno.serve(async (req) => {
             const config = await getBuilderBotConfig(lineId || 'line_recepciones');
             const url = `https://app.builderbot.cloud/api/v2/${config.projectId}/whatsapp-template`;
 
+            // Normalizar components: Meta API requiere types en UPPERCASE
+            const normalizedComponents = (components || []).map((c: any) => ({
+                ...c,
+                type: (c.type || '').toUpperCase(),
+            }));
+
             const body: any = {
                 to: number,
                 templateName,
                 languageCode: languageCode || 'es',
             };
-            if (components && components.length > 0) {
-                body.components = components;
+            if (normalizedComponents.length > 0) {
+                body.components = normalizedComponents;
             }
 
             console.log(`[send-whatsapp] Enviando template "${templateName}" a ${number} | línea: ${lineId}`);
+            console.log(`[send-whatsapp] Payload:`, JSON.stringify(body));
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -133,6 +140,12 @@ Deno.serve(async (req) => {
             });
 
             const data = await response.json();
+
+            console.log(`[send-whatsapp] Response status: ${response.status}`, JSON.stringify(data));
+
+            if (!response.ok) {
+                console.error(`[send-whatsapp] ERROR enviando template: ${response.status}`, JSON.stringify(data));
+            }
 
             return new Response(
                 JSON.stringify({ success: response.ok, data }),

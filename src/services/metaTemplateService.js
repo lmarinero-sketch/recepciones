@@ -112,6 +112,12 @@ async function fetchMetaTemplatesDirect(apiKey, projectId) {
  */
 export async function sendMetaTemplate({ to, templateName, languageCode = 'es', components = [] }) {
     try {
+        // Normalizar type de components a UPPERCASE como requiere Meta API
+        const normalizedComponents = components.map(c => ({
+            ...c,
+            type: (c.type || '').toUpperCase(), // 'body' → 'BODY'
+        }));
+
         // Intentar via Edge Function (proxy sin CORS)
         const { data, error } = await supabase.functions.invoke('send-whatsapp', {
             body: {
@@ -120,14 +126,20 @@ export async function sendMetaTemplate({ to, templateName, languageCode = 'es', 
                 number: to,
                 templateName,
                 languageCode,
-                components,
+                components: normalizedComponents,
             },
         });
 
         if (error) {
-            console.error('Edge Function error, trying direct:', error);
-            // Fallback: llamada directa
-            return await sendMetaTemplateDirect({ to, templateName, languageCode, components });
+            console.error('Edge Function invocation error:', error);
+            throw new Error(`Error de Edge Function: ${error.message || error}`);
+        }
+
+        // Verificar si la API respondió con éxito
+        if (data && data.success === false) {
+            const errMsg = data.data?.message || data.data?.error || data.error || 'Error desconocido de BuilderBot API';
+            console.error('BuilderBot API error:', data);
+            throw new Error(errMsg);
         }
 
         return data;
