@@ -582,10 +582,25 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
         try {
             const templateName = pendingMetaTemplate._metaData?.name || pendingMetaTemplate.shortcut;
             const lang = pendingMetaTemplate._metaData?.language || 'es';
+
+            // Detectar si la plantilla tiene variables {{N}} en el body
+            const bodyComponent = pendingMetaTemplate._metaData?.components?.find(c => c.type === 'BODY');
+            const bodyText = bodyComponent?.text || '';
+            const hasBodyVariables = /\{\{\d+\}\}/.test(bodyText);
+
+            // Si tiene variables, resolver con el nombre del paciente
+            const components = hasBodyVariables ? [{
+                type: 'body',
+                parameters: [
+                    { type: 'text', text: patientName || 'Paciente' }
+                ]
+            }] : [];
+
             await sendMetaTemplate({
                 to: patientPhone,
                 templateName,
                 languageCode: lang,
+                components,
             });
             // Guardar como mensaje saliente en la BD para que aparezca en el chat
             const newLineId = currentLine?.id || 'line_recepciones';
