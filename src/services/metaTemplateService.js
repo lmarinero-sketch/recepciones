@@ -111,14 +111,14 @@ async function fetchMetaTemplatesDirect(apiKey, projectId) {
  * @returns {Promise<Object>} — Respuesta de la API
  */
 export async function sendMetaTemplate({ to, templateName, languageCode = 'es', components = [] }) {
-    try {
-        // Normalizar type de components a UPPERCASE como requiere Meta API
-        const normalizedComponents = components.map(c => ({
-            ...c,
-            type: (c.type || '').toUpperCase(), // 'body' → 'BODY'
-        }));
+    // Normalizar type de components a UPPERCASE como requiere Meta API
+    const normalizedComponents = components.map(c => ({
+        ...c,
+        type: (c.type || '').toUpperCase(), // 'body' → 'BODY'
+    }));
 
-        // Intentar via Edge Function (proxy sin CORS)
+    // Intentar via Edge Function (proxy sin CORS)
+    try {
         const { data, error } = await supabase.functions.invoke('send-whatsapp', {
             body: {
                 action: 'send_template',
@@ -131,20 +131,31 @@ export async function sendMetaTemplate({ to, templateName, languageCode = 'es', 
         });
 
         if (error) {
-            console.error('Edge Function invocation error:', error);
-            throw new Error(`Error de Edge Function: ${error.message || error}`);
+            console.warn('[sendMetaTemplate] Edge Function error, intentando fallback directo:', error.message || error);
+            // Fallback: envío directo a BuilderBot API
+            return await sendMetaTemplateDirect({ to, templateName, languageCode, components: normalizedComponents });
         }
 
         // Verificar si la API respondió con éxito
         if (data && data.success === false) {
             const errMsg = data.data?.message || data.data?.error || data.error || 'Error desconocido de BuilderBot API';
-            console.error('BuilderBot API error:', data);
+            console.error('[sendMetaTemplate] BuilderBot API error:', data);
             throw new Error(errMsg);
         }
 
         return data;
     } catch (err) {
-        console.error('Error sending Meta template:', err);
+        // Si el error viene del Edge Function (no del fallback), intentar directo
+        if (!err.message?.includes('BuilderBot') && !err.message?.includes('Error ')) {
+            console.warn('[sendMetaTemplate] Error en Edge Function, intentando fallback directo:', err.message);
+            try {
+                return await sendMetaTemplateDirect({ to, templateName, languageCode, components: normalizedComponents });
+            } catch (directErr) {
+                console.error('[sendMetaTemplate] Fallback directo también falló:', directErr.message);
+                throw directErr;
+            }
+        }
+        console.error('[sendMetaTemplate] Error:', err);
         throw err;
     }
 }
