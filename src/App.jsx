@@ -135,8 +135,26 @@ function App({ currentUser, onLogout }) {
 
             <main className={`main ${sidebarCollapsed ? 'main--expanded' : ''}`}>
                 <header className="topbar no-print" style={{ flexShrink: 0 }}>
+                    {/* Background video */}
+                    <div className="topbar__video-bg">
+                        <video
+                            src="/Blue_drop_moving_left_right_202606091400.mp4"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                        />
+                    </div>
                     <div className="topbar__left">
-                        <h1 className="topbar__title"><span className="topbar__title-accent">Recepciones</span> Sanatorio Argentino</h1>
+                        <h1 className="topbar__title topbar__title--wave">
+                            {'Recepciones'.split('').map((char, i) => (
+                                <span key={`r-${i}`} className="topbar__wave-letter topbar__title-accent" style={{ animationDelay: `${i * 0.08}s` }}>{char === ' ' ? '\u00A0' : char}</span>
+                            ))}
+                            <span className="topbar__wave-letter" style={{ animationDelay: `${11 * 0.08}s` }}>&nbsp;</span>
+                            {'Sanatorio Argentino'.split('').map((char, i) => (
+                                <span key={`s-${i}`} className="topbar__wave-letter" style={{ animationDelay: `${(12 + i) * 0.08}s` }}>{char === ' ' ? '\u00A0' : char}</span>
+                            ))}
+                        </h1>
                         <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Marketing — Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'remarketing' ? 'Remarketing — Seguimiento' : activeView === 'metricas' ? 'Métricas de Chequeos' : activeView === 'recordatorios' ? 'Recordatorios de Turnos' : activeView === 'metricas_recordatorios' ? 'Métricas de Recordatorios' : activeView === 'encuestas_calidad' ? 'Encuestas de Calidad — Post Chequeo' : 'Centro de Mensajería'}</span>
                     </div>
                     

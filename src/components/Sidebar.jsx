@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     Settings, PanelLeftClose, PanelLeft,
     ChevronDown, Home, MessageSquareText, MessageCircle,
@@ -26,6 +26,38 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
     ];
 
     const isPreventivaActive = preventivaSubItems.some(i => activeView === i.id);
+
+    // ── Smooth Accordion component ──
+    function AccordionContent({ isOpen, children }) {
+        const contentRef = useRef(null);
+        const [maxHeight, setMaxHeight] = useState(isOpen ? 'none' : '0px');
+
+        useEffect(() => {
+            if (!contentRef.current) return;
+            if (isOpen) {
+                const h = contentRef.current.scrollHeight;
+                setMaxHeight(`${h}px`);
+                const timer = setTimeout(() => setMaxHeight('none'), 350);
+                return () => clearTimeout(timer);
+            } else {
+                const h = contentRef.current.scrollHeight;
+                setMaxHeight(`${h}px`);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => setMaxHeight('0px'));
+                });
+            }
+        }, [isOpen]);
+
+        return (
+            <div
+                ref={contentRef}
+                className={`sidebar__accordion ${isOpen ? 'sidebar__accordion--open' : 'sidebar__accordion--closed'}`}
+                style={{ maxHeight }}
+            >
+                {children}
+            </div>
+        );
+    }
 
     function renderGroup({ label, icon: GroupIcon, isOpen, setOpen, isGroupActive, subItems, badge }) {
         if (collapsed) {
@@ -64,14 +96,14 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
                     <span style={{ flex: 1 }}>{label}</span>
                     {badge}
                     <ChevronDown size={14} style={{
-                        transition: 'transform 0.2s ease',
+                        transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
                         transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
                         opacity: 0.5,
                     }} />
                 </button>
 
-                {isOpen && (
-                    <div className="animate-fade-in" style={{
+                <AccordionContent isOpen={isOpen}>
+                    <div style={{
                         marginLeft: '20px', borderLeft: '2px solid rgba(255, 255, 255, 0.2)',
                         paddingLeft: '0', marginTop: '2px',
                     }}>
@@ -92,20 +124,38 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
                             );
                         })}
                     </div>
-                )}
+                </AccordionContent>
             </div>
         );
     }
 
     return (
         <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
+            {/* Animated video background */}
+            <div className="sidebar__video-bg">
+                <video
+                    src="/anima_la_imagen_202606091409.mp4"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                />
+            </div>
             <div className="sidebar__brand">
                 <div className="sidebar__logo">
                     <img src="/logosanatorio.png" alt="Sanatorio Argentino" className="sidebar__logo-img" style={{ width: collapsed ? 32 : 38, height: collapsed ? 32 : 38, borderRadius: '8px', objectFit: 'contain' }} />
                     {!collapsed && (
                         <div className="sidebar__brand-text animate-fade-in">
-                            <span className="sidebar__brand-name">Sanatorio</span>
-                            <span className="sidebar__brand-sub">Argentino</span>
+                            <span className="sidebar__brand-name" style={{ display: 'flex' }}>
+                                {'Sanatorio'.split('').map((char, i) => (
+                                    <span key={i} style={{ display: 'inline-block', animation: 'title-wave 3s ease-in-out infinite', animationDelay: `${i * 0.08}s` }}>{char}</span>
+                                ))}
+                            </span>
+                            <span className="sidebar__brand-sub" style={{ display: 'flex' }}>
+                                {'Argentino'.split('').map((char, i) => (
+                                    <span key={i} style={{ display: 'inline-block', animation: 'title-wave 3s ease-in-out infinite', animationDelay: `${(i + 9) * 0.08}s` }}>{char}</span>
+                                ))}
+                            </span>
                         </div>
                     )}
                 </div>

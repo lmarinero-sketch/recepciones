@@ -679,8 +679,8 @@ a {
     z-index: 1;
 }
 
-/* All sidebar children above the overlay */
-.sidebar > * {
+/* All sidebar children above the overlays */
+.sidebar > *:not(.sidebar__video-bg) {
     position: relative;
     z-index: 2;
 }
