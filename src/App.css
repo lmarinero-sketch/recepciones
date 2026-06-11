@@ -24,22 +24,7 @@
    SIDEBAR
    ======================================== */
 
-.sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: var(--sidebar-width);
-    background: linear-gradient(rgba(10, 37, 64, 0.85), rgba(10, 37, 64, 0.95)), url('/SANARG2021_fondo.webp');
-    background-size: cover;
-    background-position: center;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    flex-direction: column;
-    z-index: 100;
-    transition: width var(--transition-normal);
-    box-shadow: var(--shadow-sm);
-}
+/* Sidebar base styles are in index.css (with animated gradient overlay) */
 
 .sidebar--collapsed {
     width: var(--sidebar-collapsed);

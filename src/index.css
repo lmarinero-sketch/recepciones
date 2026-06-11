@@ -231,6 +231,34 @@ a {
   animation: scaleIn var(--transition-fast) ease-out;
 }
 
+/* ===== VIEW TRANSITIONS ===== */
+@keyframes viewFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.view-transition-enter {
+  animation: viewFadeIn 220ms ease-out;
+}
+
+/* ===== SKELETON SHIMMER ===== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--neutral-100) 25%, var(--neutral-200) 50%, var(--neutral-100) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+/* Spin utility */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
 /* ===== TOAST NOTIFICATIONS ===== */
 .toast-container {
   position: fixed;
@@ -271,9 +299,50 @@ a {
 }
 
 .toast__message {
-  font-size: 0.875rem;
+  font-size: 0.84rem;
   font-weight: 500;
   color: var(--neutral-700);
+  flex: 1;
+  line-height: 1.4;
+}
+
+.toast__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+
+.toast--success .toast__icon { background: var(--success-50); color: var(--success-600); }
+.toast--error .toast__icon { background: var(--danger-50); color: var(--danger-600); }
+.toast--info .toast__icon { background: var(--primary-50); color: var(--primary-500); }
+
+.toast__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  transform-origin: left;
+  animation: toastProgress 3.5s linear forwards;
+}
+
+.toast--success .toast__progress { background: var(--success-500); }
+.toast--error .toast__progress { background: var(--danger-500); }
+.toast--info .toast__progress { background: var(--primary-500); }
+
+@keyframes toastProgress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(40px) scale(0.95); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 /* ===== PRINT STYLES ===== */
@@ -573,6 +642,70 @@ a {
   overflow: hidden;
   border: 1px solid var(--neutral-200);
   background: white;
+}
+
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    background: linear-gradient(rgba(10, 37, 64, 0.92), rgba(10, 37, 64, 0.96));
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    transition: width var(--transition-normal);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+/* Animated gradient overlay — subtle living background */
+.sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        135deg,
+        rgba(99, 102, 241, 0.08) 0%,
+        transparent 25%,
+        rgba(79, 70, 229, 0.06) 50%,
+        transparent 75%,
+        rgba(129, 140, 248, 0.08) 100%
+    );
+    background-size: 300% 300%;
+    animation: sidebar-gradient-shift 12s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* All sidebar children above the overlay */
+.sidebar > * {
+    position: relative;
+    z-index: 2;
+}
+
+@keyframes sidebar-gradient-shift {
+    0%   { background-position: 0% 0%; }
+    25%  { background-position: 100% 50%; }
+    50%  { background-position: 50% 100%; }
+    75%  { background-position: 0% 50%; }
+    100% { background-position: 0% 0%; }
+}
+
+/* ─── Smooth Accordion Transition ─── */
+.sidebar__accordion {
+    overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+
+.sidebar__accordion--open {
+    opacity: 1;
+}
+
+.sidebar__accordion--closed {
+    max-height: 0 !important;
+    opacity: 0;
 }
 
 .rag-sidebar {
