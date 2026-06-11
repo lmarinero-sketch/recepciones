@@ -5,7 +5,7 @@ import {
     CheckCircle2, ClipboardCheck, Building2, ChevronDown,
     Star, Clock, Mail, MailCheck
 } from 'lucide-react';
-import { fetchPacientesConAsistencia, fetchObrasSociales } from '../services/visitasService';
+import { fetchPacientesPresentes, fetchRecordatoriosObrasSociales } from '../services/recordatoriosService';
 import { sendMetaTemplate, fetchMetaTemplates } from '../services/metaTemplateService';
 import { normalizeArgentinePhone } from '../services/builderbotApi';
 import { saveOutgoingMessage } from '../services/chatService';
@@ -98,9 +98,8 @@ export default function EncuestaCalidadPanel({ addToast }) {
 
     // Load obras sociales + find encuesta template
     useEffect(() => {
-        fetchObrasSociales().then(list => {
-            const valid = list.filter(os => /^\d/.test(os));
-            setObrasSocialesList(valid);
+        fetchRecordatoriosObrasSociales().then(list => {
+            setObrasSocialesList(list);
         }).catch(console.error);
 
         fetchMetaTemplates().then(templates => {
@@ -119,7 +118,7 @@ export default function EncuestaCalidadPanel({ addToast }) {
         setLoading(true);
         setLoadProgress('Buscando pacientes...');
         try {
-            const data = await fetchPacientesConAsistencia({
+            const data = await fetchPacientesPresentes({
                 fechaDesde,
                 fechaHasta,
                 obraSocial,

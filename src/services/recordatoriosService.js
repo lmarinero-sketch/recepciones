@@ -199,3 +199,94 @@ export async function fetchRecordatoriosMetrics(onProgress) {
 
     return processed;
 }
+
+/**
+ * Obtiene pacientes con asistencia 'Presente' para envío de encuestas de calidad.
+ * Agrupa por DNI y devuelve la visita más reciente de cada paciente.
+ * 
+ * @param {Object} options - { fechaDesde, fechaHasta, obraSocial, tipoAgenda }
+ * @param {Function} onProgress - Callback (pages, rows, msg)
+ * @returns {Promise<Array>} - Pacientes agrupados con datos de contacto
+ */
+export async function fetchPacientesPresentes(options = {}, onProgress = null) {
+    const { fechaDesde, fechaHasta, obraSocial, tipoAgenda } = options;
+
+    if (!fechaDesde || !fechaHasta) return [];
+
+    if (onProgress) onProgress(0, 0, 'Buscando pacientes con asistencia presente...');
+
+    const data = await paginateQuery((from, to) => {
+        let query = supabase
+            .from('recepciones_visitas')
+            .select('*')
+            .eq('asistencia', 'Presente')
+            .gte('fecha', fechaDesde)
+            .lte('fecha', fechaHasta)
+            .order('fecha', { ascending: false })
+            .range(from, to);
+
+        if (obraSocial) query = query.ilike('obra_social', `%${obraSocial}%`);
+
+        return query;
+    });
+
+    if (!data.length) return [];
+
+    // Filtrar por tipo_agenda si se especifica
+    let filtered = filtrarPorTipoAgenda(data, tipoAgenda);
+
+    if (onProgress) onProgress(1, filtered.length, `${filtered.length} registros encontrados`);
+
+    // Agrupar por DNI (o paciente si no hay DNI)
+    const map = {};
+    for (const v of filtered) {
+        const key = v.dni || v.paciente || 'SIN_DATO';
+        if (!map[key]) {
+            map[key] = {
+                dni: v.dni,
+                paciente: v.paciente,
+                telefono1: v.telefono1,
+                telefono2: v.telefono2,
+                obra_social: v.obra_social,
+                departamento: v.departamento,
+                centro: v.centro,
+                fecha_visita: v.fecha,
+                hora_visita: v.hora,
+                medico: v.medico,
+                especialidad: v.especialidad,
+                tipo_visita: v.tipo_visita,
+                tipo_agenda: v.tipo_agenda,
+                visitas_presente: [],
+            };
+        }
+        if (!map[key].telefono1 && v.telefono1) {
+            map[key].telefono1 = v.telefono1;
+        }
+        // Keep most recent visit
+        if (v.fecha > map[key].fecha_visita) {
+            map[key].fecha_visita = v.fecha;
+            map[key].hora_visita = v.hora;
+            map[key].medico = v.medico;
+        }
+        map[key].visitas_presente.push({
+            id: v.id,
+            fecha: v.fecha,
+            hora: v.hora,
+            medico: v.medico,
+            especialidad: v.especialidad,
+            centro: v.centro,
+            tipo_visita: v.tipo_visita,
+        });
+    }
+
+    const pacientes = Object.values(map).map(p => ({
+        ...p,
+        total_visitas_presente: p.visitas_presente.length,
+    }));
+
+    // Sort by most recent visit first
+    pacientes.sort((a, b) => (b.fecha_visita || '').localeCompare(a.fecha_visita || ''));
+
+    return pacientes;
+}
+
