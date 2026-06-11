@@ -31,14 +31,34 @@ function isSurveySent(dni, fechaVisita) {
     return !!sent[`${dni}_${fechaVisita}`];
 }
 
-function getFirstDayOfMonth() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+// Generate month options from April 2026 to current month
+function getMonthOptions() {
+    const months = [];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed
+    // Start from April 2026 (month index 3)
+    const startYear = 2026;
+    const startMonth = 3; // April
+
+    let y = startYear;
+    let m = startMonth;
+    while (y < currentYear || (y === currentYear && m <= currentMonth)) {
+        const monthName = new Date(y, m, 1).toLocaleDateString('es-AR', { month: 'long' });
+        const shortYear = String(y).slice(2);
+        const label = `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${shortYear}`;
+        const desde = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        // Last day of month
+        const lastDay = new Date(y, m + 1, 0).getDate();
+        const hasta = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        months.push({ label, desde, hasta, key: `${y}-${m}` });
+        m++;
+        if (m > 11) { m = 0; y++; }
+    }
+    return months;
 }
 
-function getToday() {
-    return new Date().toISOString().split('T')[0];
-}
+const MONTH_OPTIONS = getMonthOptions();
 
 export default function EncuestaCalidadPanel({ addToast }) {
     const [pacientes, setPacientes] = useState([]);
@@ -46,9 +66,12 @@ export default function EncuestaCalidadPanel({ addToast }) {
     const [loadProgress, setLoadProgress] = useState('');
     const [search, setSearch] = useState('');
 
-    // Date range
-    const [fechaDesde, setFechaDesde] = useState(() => getFirstDayOfMonth());
-    const [fechaHasta, setFechaHasta] = useState(() => getToday());
+    // Month selector
+    const [selectedMonth, setSelectedMonth] = useState(() => MONTH_OPTIONS.length > 0 ? MONTH_OPTIONS[MONTH_OPTIONS.length - 1].key : '');
+
+    const currentMonthOpt = useMemo(() => MONTH_OPTIONS.find(m => m.key === selectedMonth), [selectedMonth]);
+    const fechaDesde = currentMonthOpt?.desde || '';
+    const fechaHasta = currentMonthOpt?.hasta || '';
 
     // Obra Social filter
     const [obraSocial, setObraSocial] = useState('');
@@ -427,30 +450,35 @@ export default function EncuestaCalidadPanel({ addToast }) {
                     ))}
                 </div>
 
+                {/* Month Tabs */}
+                <div style={{
+                    display: 'flex', gap: '6px', marginBottom: '14px',
+                    background: '#f1f5f9', borderRadius: '10px', padding: '4px',
+                    overflowX: 'auto',
+                }}>
+                    {MONTH_OPTIONS.map(month => {
+                        const isActive = selectedMonth === month.key;
+                        return (
+                            <button
+                                key={month.key}
+                                onClick={() => setSelectedMonth(month.key)}
+                                style={{
+                                    padding: '8px 18px', border: 'none', borderRadius: '8px',
+                                    fontSize: '0.82rem', fontWeight: isActive ? 700 : 500,
+                                    cursor: 'pointer', transition: 'all .15s', whiteSpace: 'nowrap',
+                                    background: isActive ? '#fff' : 'transparent',
+                                    color: isActive ? '#6d28d9' : '#64748b',
+                                    boxShadow: isActive ? '0 1px 3px rgba(0,0,0,.1)' : 'none',
+                                }}
+                            >
+                                📅 {month.label}
+                            </button>
+                        );
+                    })}
+                </div>
+
                 {/* Filters Row */}
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                    {/* Date range */}
-                    <div style={{
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px',
-                        padding: '0 14px', height: '42px',
-                    }}>
-                        <Calendar size={16} color="#8b5cf6" />
-                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Desde</span>
-                        <input type="date" value={fechaDesde}
-                            onChange={e => setFechaDesde(e.target.value)}
-                            style={{
-                                border: 'none', outline: 'none', fontSize: '0.82rem', fontWeight: 600,
-                                color: '#1e293b', background: 'transparent', cursor: 'pointer',
-                            }} />
-                        <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Hasta</span>
-                        <input type="date" value={fechaHasta}
-                            onChange={e => setFechaHasta(e.target.value)}
-                            style={{
-                                border: 'none', outline: 'none', fontSize: '0.82rem', fontWeight: 600,
-                                color: '#1e293b', background: 'transparent', cursor: 'pointer',
-                            }} />
-                    </div>
 
                     {/* Search */}
                     <div style={{
