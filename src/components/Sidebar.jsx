@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
     Settings, PanelLeftClose, PanelLeft,
     ChevronDown, Home, MessageSquareText, MessageCircle,
-    Brain, HeartPulse, RefreshCw, BarChart3, Bell,
+    Brain, HeartPulse, RefreshCw, BarChart3, Bell, ClipboardCheck,
 } from 'lucide-react';
 
 export default function Sidebar({ collapsed, onToggle, activeView, onViewChange, unreadMessageCount = 0 }) {
@@ -20,6 +20,7 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
         { id: 'chequeos', label: 'Marketing', icon: HeartPulse },
         { id: 'recordatorios', label: 'Recordatorios', icon: Bell },
         { id: 'remarketing', label: 'Remarketing', icon: RefreshCw },
+        { id: 'encuestas_calidad', label: 'Encuestas', icon: ClipboardCheck },
         { id: 'metricas', label: 'Métricas MKT', icon: BarChart3 },
         { id: 'metricas_recordatorios', label: 'Métricas Turnos', icon: BarChart3 },
     ];
