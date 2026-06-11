@@ -145,6 +145,7 @@ export default function EncuestaCalidadPanel({ addToast }) {
                 fechaDesde,
                 fechaHasta,
                 obraSocial,
+                tipoAgenda: 'CHEQUEO',
             }, (_pages, _rows, msg) => {
                 setLoadProgress(msg || 'Cargando...');
             });
