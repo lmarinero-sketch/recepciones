@@ -455,3 +455,13 @@ export async function fetchPacientesConAsistencia(options = {}, onProgress = nul
     return pacientes;
 }
 
+/**
+ * Fetch list of phones that have already received the satisfaction survey.
+ */
+export async function fetchEncuestasPreventivos() {
+    const { data } = await supabase
+        .from('encuestas_preventivos')
+        .select('telefono, estado');
+    return data || [];
+}
+

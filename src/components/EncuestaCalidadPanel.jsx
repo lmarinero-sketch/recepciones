@@ -6,30 +6,13 @@ import {
     Star, Clock, Mail, MailCheck
 } from 'lucide-react';
 import { fetchPacientesPresentes, fetchRecordatoriosObrasSociales } from '../services/recordatoriosService';
+import { fetchEncuestasPreventivos } from '../services/visitasService';
 import { sendMetaTemplate, fetchMetaTemplates } from '../services/metaTemplateService';
 import { normalizeArgentinePhone } from '../services/builderbotApi';
 import { saveOutgoingMessage } from '../services/chatService';
 import ChatWindow from './ChatWindow';
 
-// localStorage key for tracking sent surveys
-const SENT_SURVEYS_KEY = 'encuestas_calidad_enviadas';
-
-function getSentSurveys() {
-    try {
-        return JSON.parse(localStorage.getItem(SENT_SURVEYS_KEY) || '{}');
-    } catch { return {}; }
-}
-
-function markSurveySent(dni, fechaVisita) {
-    const sent = getSentSurveys();
-    sent[`${dni}_${fechaVisita}`] = new Date().toISOString();
-    localStorage.setItem(SENT_SURVEYS_KEY, JSON.stringify(sent));
-}
-
-function isSurveySent(dni, fechaVisita) {
-    const sent = getSentSurveys();
-    return !!sent[`${dni}_${fechaVisita}`];
-}
+// We will use DB instead of localStorage for surveys
 
 // Generate month options from April 2026 to current month
 function getMonthOptions() {
@@ -99,8 +82,8 @@ export default function EncuestaCalidadPanel({ addToast }) {
     // Meta template (cached)
     const [encuestaTemplate, setEncuestaTemplate] = useState(null);
 
-    // Sent surveys tracker (for UI refresh)
-    const [sentKeys, setSentKeys] = useState(() => getSentSurveys());
+    // Sent surveys tracker (from DB)
+    const [sentPhones, setSentPhones] = useState(new Set());
 
     // Close OS dropdown on outside click
     useEffect(() => {
@@ -127,11 +110,11 @@ export default function EncuestaCalidadPanel({ addToast }) {
 
         fetchMetaTemplates().then(templates => {
             const encuesta = templates.find(t =>
-                (t.name || t.templateName) === 'encuesta_de_calidad'
+                (t.name || t.templateName) === 'encuesta_de_satisfaccion'
             );
             setEncuestaTemplate(encuesta || null);
             if (!encuesta) {
-                console.warn('⚠️ Plantilla "encuesta_de_calidad" no encontrada en Meta Templates');
+                console.warn('⚠️ Plantilla "encuesta_de_satisfaccion" no encontrada en Meta Templates');
             }
         }).catch(console.error);
     }, []);
@@ -139,21 +122,26 @@ export default function EncuestaCalidadPanel({ addToast }) {
     // Load data
     const loadData = useCallback(async () => {
         setLoading(true);
-        setLoadProgress('Buscando pacientes...');
+        setLoadProgress('Buscando pacientes y encuestas...');
         try {
-            const data = await fetchPacientesPresentes({
-                fechaDesde,
-                fechaHasta,
-                obraSocial,
-                tipoAgenda: 'CHEQUEO',
-            }, (_pages, _rows, msg) => {
-                setLoadProgress(msg || 'Cargando...');
-            });
+            const [data, encuestasDB] = await Promise.all([
+                fetchPacientesPresentes({
+                    fechaDesde,
+                    fechaHasta,
+                    obraSocial,
+                    tipoAgenda: 'CHEQUEO',
+                }, (_pages, _rows, msg) => {
+                    setLoadProgress(msg || 'Cargando...');
+                }),
+                fetchEncuestasPreventivos()
+            ]);
             setLoadProgress('');
             setPacientes(data);
+            const sentPhonesSet = new Set(encuestasDB.map(e => e.telefono));
+            setSentPhones(sentPhonesSet);
         } catch (e) {
             console.error(e);
-            addToast?.('Error cargando pacientes con asistencia', 'error');
+            addToast?.('Error cargando datos', 'error');
         } finally {
             setLoading(false);
         }
@@ -179,9 +167,9 @@ export default function EncuestaCalidadPanel({ addToast }) {
         const total = filtered.length;
         const conTel = pacientesConTel.length;
         const sinTel = total - conTel;
-        const enviados = filtered.filter(p => isSurveySent(p.dni, p.fecha_visita)).length;
+        const enviados = filtered.filter(p => p.telefono1 && sentPhones.has(normalizeArgentinePhone(p.telefono1))).length;
         return { total, conTel, sinTel, enviados };
-    }, [filtered, pacientesConTel, sentKeys]);
+    }, [filtered, pacientesConTel, sentPhones]);
 
     // Send individual survey
     const handleSendEncuesta = useCallback(async (paciente) => {
@@ -190,20 +178,19 @@ export default function EncuestaCalidadPanel({ addToast }) {
             return;
         }
         if (!encuestaTemplate) {
-            addToast?.('Plantilla "encuesta_de_calidad" no encontrada. Verificar en Meta Business', 'error');
+            addToast?.('Plantilla "encuesta_de_satisfaccion" no encontrada. Verificar en Meta Business', 'error');
             return;
         }
 
-        const key = `${paciente.dni}_${paciente.fecha_visita}`;
-        if (isSurveySent(paciente.dni, paciente.fecha_visita)) {
-            addToast?.('Ya se envió la encuesta a este paciente para esta visita', 'warning');
+        const phone = normalizeArgentinePhone(paciente.telefono1);
+        if (sentPhones.has(phone)) {
+            addToast?.('Ya se envió la encuesta a este paciente', 'warning');
             return;
         }
 
         setSendingTo(paciente.dni);
         try {
             const nombre = paciente.paciente?.split(',')[0]?.trim() || 'Paciente';
-            const phone = normalizeArgentinePhone(paciente.telefono1);
             const templateName = encuestaTemplate.name || encuestaTemplate.templateName;
             const lang = encuestaTemplate.language || 'es_AR';
 
@@ -231,8 +218,11 @@ export default function EncuestaCalidadPanel({ addToast }) {
                 lineId: 'line_recepciones',
             }).catch(err => console.warn('Error saving outgoing msg:', err));
 
-            markSurveySent(paciente.dni, paciente.fecha_visita);
-            setSentKeys({ ...getSentSurveys() });
+            setSentPhones(prev => {
+                const updated = new Set(prev);
+                updated.add(phone);
+                return updated;
+            });
             addToast?.(`✅ Encuesta enviada a ${nombre}`, 'success');
         } catch (e) {
             console.error('Error enviando encuesta:', e);
@@ -240,7 +230,7 @@ export default function EncuestaCalidadPanel({ addToast }) {
         } finally {
             setSendingTo(null);
         }
-    }, [encuestaTemplate, addToast]);
+    }, [encuestaTemplate, addToast, sentPhones]);
 
     // Bulk send
     const handleBulkStart = useCallback(() => {
@@ -303,7 +293,11 @@ export default function EncuestaCalidadPanel({ addToast }) {
                     lineId: 'line_recepciones',
                 }).catch(() => {});
 
-                markSurveySent(p.dni, p.fecha_visita);
+                setSentPhones(prev => {
+                    const updated = new Set(prev);
+                    updated.add(phone);
+                    return updated;
+                });
                 sent++;
                 setBulkProgress(prev => ({ ...prev, sent: prev.sent + 1 }));
             } catch (e) {
@@ -321,7 +315,6 @@ export default function EncuestaCalidadPanel({ addToast }) {
         setBulkSending(false);
         setBulkSelectionMode(false);
         setSelectedForBulk([]);
-        setSentKeys({ ...getSentSurveys() });
         addToast?.(
             `✅ Envío completado: ${sent} enviados, ${failed} fallidos`,
             failed > 0 ? 'warning' : 'success'
@@ -605,7 +598,7 @@ export default function EncuestaCalidadPanel({ addToast }) {
                                     setSelectedForBulk([]);
                                 } else {
                                     // Select all with phone that haven't been sent
-                                    const pending = pacientesConTel.filter(p => !isSurveySent(p.dni, p.fecha_visita));
+                                    const pending = pacientesConTel.filter(p => !sentPhones.has(normalizeArgentinePhone(p.telefono1)));
                                     setSelectedForBulk(pending);
                                 }
                             }}
@@ -647,7 +640,8 @@ export default function EncuestaCalidadPanel({ addToast }) {
                     ) : (
                         filtered.map((p, idx) => {
                             const hasPhone = !!p.telefono1;
-                            const alreadySent = isSurveySent(p.dni, p.fecha_visita);
+                            const phoneNormalized = hasPhone ? normalizeArgentinePhone(p.telefono1) : null;
+                            const alreadySent = phoneNormalized && sentPhones.has(phoneNormalized);
                             const isChecked = selectedForBulk.some(sel => sel.dni === p.dni);
                             const isSending = sendingTo === p.dni;
 
@@ -872,7 +866,7 @@ export default function EncuestaCalidadPanel({ addToast }) {
                             Enviar encuesta masiva
                         </h3>
                         <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '8px' }}>
-                            Se enviará la plantilla <strong>"encuesta_de_calidad"</strong> a:
+                            Se enviará la plantilla <strong>"encuesta_de_satisfaccion"</strong> a:
                         </p>
                         <div style={{
                             padding: '12px', borderRadius: '10px', background: '#f5f3ff',
