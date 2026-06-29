@@ -131,14 +131,30 @@ export async function sendMetaTemplate({ to, templateName, languageCode = 'es', 
         });
 
         if (error) {
-            console.warn('[sendMetaTemplate] Edge Function error, intentando fallback directo:', error.message || error);
+            // Intentar extraer detalles reales del FunctionsHttpError
+            let realMessage = error.message;
+            try {
+                // FunctionsHttpError tiene un context con la respuesta original
+                if (error.context?.body) {
+                    const body = await error.context.json?.() || JSON.parse(error.context.body);
+                    realMessage = body?.data?.message || body?.data?.error || body?.error || realMessage;
+                }
+            } catch (_) { /* no se pudo parsear */ }
+
+            console.warn('[sendMetaTemplate] Edge Function error:', realMessage, error);
             // Fallback: envío directo a BuilderBot API
-            return await sendMetaTemplateDirect({ to, templateName, languageCode, components: normalizedComponents });
+            try {
+                return await sendMetaTemplateDirect({ to, templateName, languageCode, components: normalizedComponents });
+            } catch (directErr) {
+                // Si el fallback también falla, lanzar el error original con detalle
+                throw new Error(realMessage || directErr.message);
+            }
         }
 
-        // Verificar si la API respondió con éxito
+        // Verificar si la API respondió con éxito (ahora siempre status 200, pero success:false)
         if (data && data.success === false) {
-            const errMsg = data.data?.message || data.data?.error || data.error || 'Error desconocido de BuilderBot API';
+            const apiData = data.data || {};
+            const errMsg = apiData.message || apiData.error?.message || apiData.error || data.error || 'Error desconocido de BuilderBot API';
             console.error('[sendMetaTemplate] BuilderBot API error:', data);
             throw new Error(errMsg);
         }

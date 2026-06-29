@@ -6,7 +6,7 @@ import {
     Star, Clock, Mail, MailCheck
 } from 'lucide-react';
 import { fetchPacientesPresentes, fetchRecordatoriosObrasSociales } from '../services/recordatoriosService';
-import { fetchEncuestasPreventivos } from '../services/visitasService';
+import { fetchEncuestasPreventivos, crearEncuestaPreventivo } from '../services/visitasService';
 import { sendMetaTemplate, fetchMetaTemplates } from '../services/metaTemplateService';
 import { normalizeArgentinePhone } from '../services/builderbotApi';
 import { saveOutgoingMessage } from '../services/chatService';
@@ -211,6 +211,9 @@ export default function EncuestaCalidadPanel({ addToast }) {
                 components,
             });
 
+            // Create record in DB for the webhook to match
+            await crearEncuestaPreventivo(phone).catch(err => console.warn('Error creating survey record:', err));
+
             await saveOutgoingMessage({
                 phone,
                 content: `📋 [Encuesta Calidad] ${templateName}: ${bodyText.replace(/\{\{1\}\}/g, nombre)}`,
@@ -285,6 +288,9 @@ export default function EncuestaCalidadPanel({ addToast }) {
                     languageCode: lang,
                     components,
                 });
+
+                // Create record in DB for the webhook to match
+                await crearEncuestaPreventivo(phone).catch(() => {});
 
                 await saveOutgoingMessage({
                     phone,

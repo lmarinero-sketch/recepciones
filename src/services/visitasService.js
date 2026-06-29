@@ -465,3 +465,20 @@ export async function fetchEncuestasPreventivos() {
     return data || [];
 }
 
+/**
+ * Inserta un nuevo registro de encuesta en estado INVITADO.
+ */
+export async function crearEncuestaPreventivo(telefono) {
+    const { data, error } = await supabase
+        .from('encuestas_preventivos')
+        .insert({
+            telefono,
+            estado: 'INVITADO'
+        });
+    if (error) {
+        console.error('Error creando encuesta:', error);
+        throw error;
+    }
+    return data;
+}
+
