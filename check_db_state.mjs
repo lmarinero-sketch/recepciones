@@ -7,19 +7,31 @@ const env = fs.readFileSync('.env', 'utf-8').split('\n').reduce((acc, line) => {
     return acc;
 }, {});
 
-const supabaseUrl = env.VITE_SUPABASE_URL;
-const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY || env.VITE_SUPABASE_ANON_KEY);
 
 async function run() {
-    const phone = '5492645438114';
-    const { data: survey } = await supabase
-        .from('encuestas_preventivos')
+    console.log('--- Buscando en recepciones_visitas ---');
+    const { data: latest, error: err1 } = await supabase
+        .from('recepciones_visitas')
         .select('*')
-        .eq('telefono', phone)
-        .order('created_at', { ascending: false });
-        
-    console.log('Survey record:', survey);
-}
+        .limit(5);
 
-run().catch(console.error);
+    if (err1) console.error('Error recepciones_visitas:', err1);
+    else {
+        console.log('--- recepciones_visitas ---');
+        console.table(latest);
+    }
+    
+    // Y vamos a revisar si insertó en la tabla de turnos o algo así
+    const { data: latest2, error: err2 } = await supabase
+        .from('visitas_chequeo')
+        .select('id, fecha, paciente')
+        .limit(5);
+        
+    if (err2) console.error('Error visitas_chequeo:', err2);
+    else {
+        console.log('--- visitas_chequeo ---');
+        console.table(latest2);
+    }
+}
+run();

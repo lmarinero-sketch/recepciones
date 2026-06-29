@@ -30,11 +30,12 @@ Deno.serve(async (req) => {
 
         // 1. Buscar pacientes desde Junio 2026 en adelante
         const { data: visitas, error: fetchError } = await supabase
-            .from('visitas_chequeo')
-            .select('dni, paciente, telefono1_paciente, hora, fecha')
+            .from('recepciones_visitas')
+            .select('dni, paciente, telefono1, hora, fecha')
             .gte('fecha', startDate)
             .eq('asistencia', 'Presente')
-            .not('telefono1_paciente', 'is', null)
+            .ilike('tipo_visita', '%CHQ%')
+            .not('telefono1', 'is', null)
             .order('fecha', { ascending: true });
 
         if (fetchError) throw fetchError;
@@ -46,7 +47,7 @@ Deno.serve(async (req) => {
         // Extraer teléfonos únicos y el primer nombre del paciente
         const patientsMap = new Map();
         visitas.forEach(v => {
-            let phone = String(v.telefono1_paciente).replace(/\D/g, '');
+            let phone = String(v.telefono1).replace(/\D/g, '');
             // Simple validación: si tiene más de 9 dígitos lo consideramos
             if (phone.length >= 9) {
                 // Formato WhatsApp esperado por Meta y nuestra DB: 549XXXXXXXXXX
