@@ -23,6 +23,7 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
         { id: 'encuestas_calidad', label: 'Encuestas', icon: ClipboardCheck },
         { id: 'metricas', label: 'Métricas MKT', icon: BarChart3 },
         { id: 'metricas_recordatorios', label: 'Métricas Turnos', icon: BarChart3 },
+        { id: 'metricas_encuestas', label: 'Métricas Encuestas', icon: BarChart3 },
     ];
 
     const isPreventivaActive = preventivaSubItems.some(i => activeView === i.id);

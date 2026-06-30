@@ -585,6 +585,17 @@ async function handleSurveyFlow(supabase: any, phone: string, content: string, l
                 lineId: lineId
             })
         }).catch(e => console.error('[survey] Error sending msg:', e));
+
+        // Registrar el mensaje saliente del bot en la base de datos para que sea visible en la interfaz
+        await supabase.from('whatsapp_messages').insert({
+            phone: phone,
+            direction: 'outgoing',
+            content: msg,
+            media_type: 'text',
+            sender_name: 'Dora (Bot)',
+            is_read: true,
+            line_id: lineId
+        }).catch((e: any) => console.error('[survey] Error logging msg:', e));
     };
 
     try {

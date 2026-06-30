@@ -482,3 +482,14 @@ export async function crearEncuestaPreventivo(telefono) {
     return data;
 }
 
+/**
+ * Fetch all survey responses mapped with detailed metrics
+ */
+export async function fetchDetalleEncuestas() {
+    const { data } = await supabase
+        .from('encuestas_preventivos')
+        .select('*')
+        .order('created_at', { ascending: false });
+    return data || [];
+}
+
