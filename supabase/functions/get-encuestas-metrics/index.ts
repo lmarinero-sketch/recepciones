@@ -32,8 +32,28 @@ serve(async (req) => {
             throw error;
         }
 
+        // Fetch contact names from crm_contacts
+        const phones = [...new Set(data.map(d => d.telefono))].filter(Boolean);
+        const { data: contacts } = await supabase
+            .from('crm_contacts')
+            .select('phone, nombre')
+            .in('phone', phones);
+
+        const contactMap = {};
+        if (contacts) {
+            contacts.forEach(c => {
+                contactMap[c.phone] = c.nombre;
+            });
+        }
+
+        // Attach names
+        const dataWithNames = data.map(d => ({
+            ...d,
+            nombre_paciente: contactMap[d.telefono] || 'Paciente Desconocido'
+        }));
+
         return new Response(
-            JSON.stringify({ data }),
+            JSON.stringify({ data: dataWithNames }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
     } catch (error) {

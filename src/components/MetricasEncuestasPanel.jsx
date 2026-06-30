@@ -60,6 +60,7 @@ export default function MetricasEncuestasPanel({ addToast }) {
             if (e.cierre_comentario && e.cierre_comentario.trim().length > 0) {
                 comentarios.push({
                     telefono: e.telefono,
+                    nombre: e.nombre_paciente || 'Paciente',
                     fecha: e.updated_at || e.created_at,
                     texto: e.cierre_comentario,
                     audio: e.cierre_audio_url
@@ -213,8 +214,13 @@ export default function MetricasEncuestasPanel({ addToast }) {
                                     {metrics.comentarios.map((c, i) => (
                                         <div key={i} style={{ padding: '16px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>
-                                                    <Phone size={12} /> {c.telefono}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.85rem' }}>
+                                                        {c.nombre}
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#64748b' }}>
+                                                        <Phone size={10} /> {c.telefono}
+                                                    </div>
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#94a3b8' }}>
                                                     <Calendar size={12} /> {new Date(c.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
