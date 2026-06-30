@@ -486,10 +486,15 @@ export async function crearEncuestaPreventivo(telefono) {
  * Fetch all survey responses mapped with detailed metrics
  */
 export async function fetchDetalleEncuestas() {
-    const { data } = await supabase
-        .from('encuestas_preventivos')
-        .select('*')
-        .order('created_at', { ascending: false });
-    return data || [];
+    const { data, error } = await supabase.functions.invoke('get-encuestas-metrics', {
+        method: 'POST'
+    });
+
+    if (error) {
+        console.error('Error fetching from get-encuestas-metrics:', error);
+        return [];
+    }
+
+    return data?.data || [];
 }
 
