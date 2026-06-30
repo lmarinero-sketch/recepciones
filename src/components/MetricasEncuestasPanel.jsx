@@ -61,6 +61,7 @@ export default function MetricasEncuestasPanel({ addToast }) {
                 comentarios.push({
                     telefono: e.telefono,
                     nombre: e.nombre_paciente || 'Paciente',
+                    fecha_turno: e.fecha_turno,
                     fecha: e.updated_at || e.created_at,
                     texto: e.cierre_comentario,
                     audio: e.cierre_audio_url
@@ -221,6 +222,11 @@ export default function MetricasEncuestasPanel({ addToast }) {
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#64748b' }}>
                                                         <Phone size={10} /> {c.telefono}
                                                     </div>
+                                                    {c.fecha_turno && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', color: '#0ea5e9', background: '#e0f2fe', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>
+                                                            <Calendar size={10} /> Turno: {new Date(c.fecha_turno + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#94a3b8' }}>
                                                     <Calendar size={12} /> {new Date(c.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}

@@ -46,10 +46,42 @@ serve(async (req) => {
             });
         }
 
-        // Attach names
+        // Fetch recent visits to get the appointment date
+        // Solo necesitamos los últimos 30-60 días para cubrir las encuestas recientes
+        const { data: visitas } = await supabase
+            .from('recepciones_visitas')
+            .select('telefono1, fecha')
+            .not('telefono1', 'is', null)
+            .order('fecha', { ascending: false })
+            .limit(1000); // Suficiente para las últimas semanas
+
+        const visitDateMap = {};
+        if (visitas) {
+            visitas.forEach(v => {
+                if (!v.telefono1) return;
+                let phone = String(v.telefono1).replace(/\D/g, '');
+                if (phone.length >= 9) {
+                    if (phone.startsWith('54') && !phone.startsWith('549')) {
+                        phone = '549' + phone.substring(2);
+                    } else if (!phone.startsWith('54')) {
+                        phone = phone.length === 10 ? '549' + phone : '549264' + phone;
+                    }
+                    
+                    // Solo guardamos la fecha más reciente (como están ordenados descendentemente,
+                    // la primera que encontremos es la más reciente o podemos simplemente asignar
+                    // pero no sobreescribir si ya existe)
+                    if (!visitDateMap[phone]) {
+                        visitDateMap[phone] = v.fecha;
+                    }
+                }
+            });
+        }
+
+        // Attach names and appointment dates
         const dataWithNames = data.map(d => ({
             ...d,
-            nombre_paciente: contactMap[d.telefono] || 'Paciente Desconocido'
+            nombre_paciente: contactMap[d.telefono] || 'Paciente Desconocido',
+            fecha_turno: visitDateMap[d.telefono] || null
         }));
 
         return new Response(
