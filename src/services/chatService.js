@@ -42,7 +42,7 @@ export async function fetchConversations() {
         if (msg.line_id) {
             map[msg.phone].usedLines.add(msg.line_id);
         }
-        // Prefer sender_name from incoming messages (outgoing says "Sistema ADM-QUI")
+        // Prefer sender_name from incoming messages (outgoing says "Sistema Recepciones")
         if (msg.direction === 'incoming' && msg.sender_name && !map[msg.phone].senderName) {
             map[msg.phone].senderName = msg.sender_name;
         }

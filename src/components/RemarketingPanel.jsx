@@ -94,7 +94,7 @@ export default function RemarketingPanel({ addToast }) {
             const phone = normalizeArgentinePhone(checkup.telefono1);
             await sendMetaTemplate({
                 to: phone,
-                templateName: 'captar_clientes',
+                templateName: 'marketing',
                 languageCode: 'es_AR',
                 components: [{ type: 'BODY', parameters: [{ type: 'text', text: nombre }] }],
             });

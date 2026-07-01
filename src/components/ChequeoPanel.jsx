@@ -215,9 +215,12 @@ export default function ChequeoPanel({ addToast }) {
             setBulkMode(true);
             setMsgTarget(null);
             
-            // Auto-select "captar_clientes" if available
-            const defaultTpl = metaTemplates.find(t => (t.name || t.templateName) === 'captar_clientes');
-            setSelectedMetaTemplate(defaultTpl || metaTemplates[0] || null);
+            // Auto-select template para chequeos (evitar "captar_clientes" que es de quirófano)
+            const defaultTpl = metaTemplates.find(t => {
+                const name = (t.name || t.templateName || '').toLowerCase();
+                return name === 'marketing' || name.includes('chequeo');
+            });
+            setSelectedMetaTemplate(defaultTpl || null);
 
             setShowMsgModal(true);
             setConfirmStep(false);

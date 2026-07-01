@@ -330,7 +330,7 @@ export default function LoginScreen({ onLogin }) {
                     color: '#94A3B8',
                     fontWeight: 500,
                 }}>
-                    Sistema ADM-QUI · Grow Labs © 2026
+                    Sistema Recepciones · Grow Labs © 2026
                 </p>
             </div>
 

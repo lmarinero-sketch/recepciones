@@ -122,7 +122,7 @@ export function formatOrderForWhatsApp(patientData, cartItems) {
         `${i + 1}. [${item.code}] ${item.name} × ${item.quantity} (${item.date || patientData.fecha})`
     ).join('\n');
 
-    const footer = `\n${'─'.repeat(30)}\n📌 Total: ${cartItems.length} práctica(s)\n🖨️ Generado por Sistema ADM-QUI`;
+    const footer = `\n${'─'.repeat(30)}\n📌 Total: ${cartItems.length} práctica(s)\n🖨️ Generado por Sistema Recepciones`;
 
     return `${header}\n\n${patient}\n\n📋 *Prácticas solicitadas:*\n${items}${footer}`;
 }
