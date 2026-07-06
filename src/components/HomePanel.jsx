@@ -12,7 +12,6 @@ import {
 const WORKFLOW_STEPS = [
     { icon: HeartPulse, label: 'Chequeos', desc: 'Buscar pacientes y enviar invitación', color: '#3B82F6' },
     { icon: CalendarCheck, label: 'Agendar', desc: 'Paciente acepta → asignar fecha', color: '#0EA5E9' },
-    { icon: Bell, label: 'Remarketing', desc: 'Recordatorio el día del turno', color: '#8B5CF6' },
     { icon: BarChart3, label: 'Métricas', desc: 'Seguimiento y análisis', color: '#10B981' },
 ];
 
@@ -35,9 +34,8 @@ const GUIDE_SECTIONS = [
                 { icon: Search, title: 'Paso 1 — Buscar Paciente', text: 'En el panel de Chequeos, seleccionás la fecha y buscás pacientes que se hicieron el chequeo hace 1 año. El sistema los carga desde la base de datos de visitas.' },
                 { icon: Send, title: 'Paso 2 — Enviar Invitación', text: 'Le enviás un mensaje de WhatsApp al paciente invitándolo a realizarse el chequeo anual. Usás la plantilla /chequeo que personaliza el mensaje con su nombre.' },
                 { icon: Phone, title: 'Paso 3 — El Paciente Acepta', text: 'El paciente responde al mensaje. Vos entrás al Chat Central, leés la respuesta y coordinás la fecha del turno.' },
-                { icon: CalendarCheck, title: 'Paso 4 — Agendar Turno', text: 'Desde el panel de Chequeos, tocás el botón "📅 Agendar Turno" y cargás la fecha confirmada. Esto envía al paciente al módulo de Remarketing.' },
-                { icon: Bell, title: 'Paso 5 — Recordatorio', text: 'En Remarketing aparece automáticamente el paciente con su fecha de turno. Un día antes le enviás el recordatorio con la plantilla /recordatorio.' },
-                { icon: CheckCircle2, title: 'Paso 6 — Confirmación', text: 'Cambiás el estado del paciente a "Confirmó", "Canceló" o "Reprogramó" según la respuesta.' },
+                { icon: CalendarCheck, title: 'Paso 4 — Agendar Turno', text: 'Desde el panel de Chequeos, tocás el botón "📅 Agendar Turno" y cargás la fecha confirmada.' },
+                { icon: CheckCircle2, title: 'Paso 5 — Confirmación', text: 'Cambiás el estado del paciente a "Confirmó", "Canceló" o "Reprogramó" según la respuesta.' },
             ]},
         ],
     },
@@ -57,36 +55,12 @@ const GUIDE_SECTIONS = [
                 { icon: Users, title: 'Tarjetas de Resumen', text: 'Ves de un vistazo: cantidad de pacientes, cuántos tienen teléfono y cuántos no.' },
                 { icon: Search, title: 'Filtros', text: 'Buscá por nombre, DNI, teléfono u obra social. También podés elegir "Día Exacto" o "Mes Completo".' },
                 { icon: Send, title: 'Enviar Recordatorio', text: 'Seleccioná un paciente, tocá "Enviar Recordatorio" para mandarle WhatsApp con la plantilla /chequeo.' },
-                { icon: CalendarCheck, title: 'Agendar Turno', text: 'Cuando el paciente acepta, tocá "📅 Agendar Turno", elegí la fecha y listo. Pasa automáticamente a Remarketing.' },
+                { icon: CalendarCheck, title: 'Agendar Turno', text: 'Cuando el paciente acepta, tocá "📅 Agendar Turno", elegí la fecha y listo.' },
             ]},
             { type: 'tip', text: 'Podés usar "Enviar a Todos" para mandar el mensaje masivo a todos los pacientes con teléfono de esa fecha.' },
         ],
     },
-    {
-        id: 'remarketing',
-        title: 'Panel de Remarketing',
-        icon: RefreshCw,
-        color: '#8B5CF6',
-        bg: '#F5F3FF',
-        description: 'Gestioná los recordatorios de turnos confirmados.',
-        image: '/help/remarketing.png',
-        content: [
-            { type: 'heading', text: '¿Qué es el Remarketing?' },
-            { type: 'text', text: 'Este panel muestra SOLO los pacientes que ya tienen un turno agendado desde el panel de Chequeos. Acá les mandás el recordatorio previo al turno y hacés seguimiento de su asistencia.' },
-            { type: 'features', items: [
-                { icon: BarChart3, title: 'Pipeline Visual', text: 'El embudo te muestra cuántos pacientes están en cada estado: Pendiente, Enviado, Confirmó, Canceló, Reprogramó.' },
-                { icon: Bell, title: 'Enviar Recordatorio', text: 'Un día antes del turno, buscá al paciente y mandále el recordatorio usando la plantilla /recordatorio.' },
-                { icon: CheckCircle2, title: 'Actualizar Estado', text: 'Cuando el paciente responde, cambiá su estado: ✅ Confirmó, ❌ Canceló o 🔄 Reprogramó.' },
-            ]},
-            { type: 'pipeline', states: [
-                { label: 'Pendiente', color: '#94A3B8', desc: 'Turno agendado, aún sin recordatorio' },
-                { label: 'Enviado', color: '#3B82F6', desc: 'Ya le mandaste el recordatorio' },
-                { label: 'Confirmó', color: '#10B981', desc: 'El paciente confirmó asistencia' },
-                { label: 'Canceló', color: '#EF4444', desc: 'El paciente canceló el turno' },
-                { label: 'Reprogramó', color: '#F59E0B', desc: 'Se cambió la fecha del turno' },
-            ]},
-        ],
-    },
+
     {
         id: 'mensajeria',
         title: 'Centro de Mensajería',
@@ -389,7 +363,6 @@ export default function HomePanel() {
                         {[
                             { icon: HeartPulse, label: 'Chequeos', sub: 'Prevención' },
                             { icon: MessageCircle, label: 'Mensajería', sub: 'WhatsApp' },
-                            { icon: RefreshCw, label: 'Remarketing', sub: 'Recordatorios' },
                             { icon: BarChart3, label: 'Métricas', sub: 'Análisis' },
                         ].map((item, i) => {
                             const Icon = item.icon;

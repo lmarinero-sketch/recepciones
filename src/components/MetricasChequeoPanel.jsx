@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     BarChart3, TrendingUp, Users, Calendar, Loader2, RefreshCw,
-    ArrowUpRight, ArrowDownRight, Minus, Building2, Activity, CalendarCheck
+    ArrowUpRight, ArrowDownRight, Minus, Building2, Activity, CalendarCheck, Info
 } from 'lucide-react';
 import {
     ComposedChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -137,6 +137,7 @@ export default function MetricasChequeoPanel({ addToast }) {
     const [loading, setLoading] = useState(true);
     const [progress, setProgress] = useState('');
     const [selectedYear, setSelectedYear] = useState('todos');
+    const [showInfo, setShowInfo] = useState(false);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -245,18 +246,18 @@ export default function MetricasChequeoPanel({ addToast }) {
                         </div>
                         Métricas de Chequeos
                     </h2>
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 50px' }}>
-                        Análisis de pacientes únicos atendidos por mes y obra social
-                    </p>
-                </div>
-                <button onClick={loadData} disabled={loading} style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px',
-                    background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px',
-                    cursor: 'pointer', fontSize: '0.8rem', color: '#475569', fontWeight: 600,
-                }}>
-                    <RefreshCw size={14} /> Actualizar
-                </button>
+                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 50px', maxWidth: '600px', lineHeight: 1.5 }}>
+                    Análisis del volumen total de la agenda. <strong>"Paciente Atendido"</strong> contabiliza a todo paciente único que tuvo un turno de CHQ en el mes, sin importar si luego fue marcado como Presente o Ausente. Toda la data se alimenta de la tabla histórica de visitas.
+                </p>
             </div>
+            <button onClick={loadData} disabled={loading} style={{
+                display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px',
+                background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px',
+                cursor: 'pointer', fontSize: '0.8rem', color: '#475569', fontWeight: 600,
+            }}>
+                <RefreshCw size={14} /> Actualizar
+            </button>
+        </div>
 
             {/* Year Tabs */}
             <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexShrink: 0, flexWrap: 'wrap' }}>
@@ -304,8 +305,9 @@ export default function MetricasChequeoPanel({ addToast }) {
                             <TrendingUp size={18} color="#f59e0b" />
                             Proyección de Marketing
                         </h3>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            Pacientes listos para recibir campañas de captación (por vencimiento anual)
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'right', maxWidth: '300px', lineHeight: 1.4 }}>
+                            Agrupa a los pacientes por su fecha de vencimiento anual (hace 12 meses o más). 
+                            <br/><span style={{color: '#10b981', fontWeight: 600}}>Contactables</span> indica cuántos tienen un teléfono válido.
                         </div>
                     </div>
                     
@@ -334,9 +336,14 @@ export default function MetricasChequeoPanel({ addToast }) {
                         flex: 2, background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px',
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
-                                Evolución Mensual de Pacientes
-                            </h3>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
+                                    Evolución Mensual de Pacientes
+                                </h3>
+                                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0 0', maxWidth: '400px' }}>
+                                    Muestra el volumen total de pacientes agendados por mes. Incluye a todos los pacientes (Presentes y Ausentes).
+                                </p>
+                            </div>
                             <div style={{ display: 'flex', gap: '16px', fontSize: '0.72rem', color: '#94a3b8' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <span style={{ width: 10, height: 10, borderRadius: 3, background: '#10b981' }} /> Pacientes
@@ -436,10 +443,13 @@ export default function MetricasChequeoPanel({ addToast }) {
                 <div style={{
                     background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden',
                 }}>
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc' }}>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: '#475569' }}>
                             Detalle Mes a Mes ({aggregated.months.length} meses)
                         </h3>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            Desglosa el volumen total para separar quiénes realmente asistieron (<strong>Presentes</strong>) de los que faltaron (<strong>Ausentes</strong>).
+                        </div>
                     </div>
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>

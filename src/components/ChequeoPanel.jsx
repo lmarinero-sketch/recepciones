@@ -1473,7 +1473,7 @@ export default function ChequeoPanel({ addToast }) {
                                 }}
                             />
                             <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '10px', lineHeight: 1.5 }}>
-                                Este paciente aparecerá en el panel de <strong>Remarketing</strong> para enviar recordatorios cuando se acerque la fecha de este turno.
+                                Este paciente aparecerá en el panel de <strong>Recordatorios</strong> para enviar notificaciones cuando se acerque la fecha de este turno.
                             </p>
                         </div>
 

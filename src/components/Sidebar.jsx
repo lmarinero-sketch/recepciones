@@ -19,7 +19,6 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
     const preventivaSubItems = [
         { id: 'chequeos', label: 'Marketing', icon: HeartPulse },
         { id: 'recordatorios', label: 'Recordatorios', icon: Bell },
-        { id: 'remarketing', label: 'Remarketing', icon: RefreshCw },
         { id: 'encuestas_calidad', label: 'Encuestas', icon: ClipboardCheck },
         { id: 'metricas', label: 'Métricas MKT', icon: BarChart3 },
         { id: 'metricas_recordatorios', label: 'Métricas Turnos', icon: BarChart3 },
@@ -204,7 +203,7 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
                 })}
 
                 {renderGroup({
-                    label: 'Gestión Preventiva',
+                    label: 'Chequeos',
                     icon: HeartPulse,
                     isOpen: preventivaOpen,
                     setOpen: setPreventivaOpen,

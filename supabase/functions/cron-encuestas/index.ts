@@ -24,7 +24,11 @@ Deno.serve(async (req) => {
     try {
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-        const startDate = '2026-06-01';
+        // Calcular la fecha actual (o la de hoy para buscar pacientes recientes)
+        const today = new Date();
+        // Restar algunas horas si se necesita asegurar de tomar el día local correcto (ej: Argentina UTC-3)
+        today.setHours(today.getHours() - 3);
+        const startDate = today.toISOString().split('T')[0];
 
         console.log(`[cron-encuestas] Buscando pacientes con asistencia='Presente' desde el ${startDate}...`);
 

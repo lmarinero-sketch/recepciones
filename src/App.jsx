@@ -13,7 +13,6 @@ import WhatsAppLineStatus from './components/WhatsAppLineStatus.jsx';
 import HomePanel from './components/HomePanel.jsx';
 import ChequeoPanel from './components/ChequeoPanel.jsx';
 import ConfigPanel from './components/ConfigPanel.jsx';
-import RemarketingPanel from './components/RemarketingPanel.jsx';
 import MetricasChequeoPanel from './components/MetricasChequeoPanel.jsx';
 import RecordatoriosPanel from './components/RecordatoriosPanel.jsx';
 import MetricasRecordatoriosPanel from './components/MetricasRecordatoriosPanel.jsx';
@@ -156,7 +155,7 @@ function App({ currentUser, onLogout }) {
                                 <span key={`s-${i}`} className="topbar__wave-letter" style={{ animationDelay: `${(12 + i) * 0.08}s` }}>{char === ' ' ? '\u00A0' : char}</span>
                             ))}
                         </h1>
-                        <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Marketing — Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'remarketing' ? 'Remarketing — Seguimiento' : activeView === 'metricas' ? 'Métricas de Chequeos' : activeView === 'recordatorios' ? 'Recordatorios de Turnos' : activeView === 'metricas_recordatorios' ? 'Métricas de Recordatorios' : activeView === 'encuestas_calidad' ? 'Encuestas de Calidad — Post Chequeo' : activeView === 'metricas_encuestas' ? 'Métricas de Encuestas' : 'Centro de Mensajería'}</span>
+                        <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Marketing — Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'metricas' ? 'Métricas de Chequeos' : activeView === 'recordatorios' ? 'Recordatorios de Turnos' : activeView === 'metricas_recordatorios' ? 'Métricas de Recordatorios' : activeView === 'encuestas_calidad' ? 'Encuestas de Calidad — Post Chequeo' : activeView === 'metricas_encuestas' ? 'Métricas de Encuestas' : 'Centro de Mensajería'}</span>
                     </div>
                     
                     {/* WhatsAppLineStatus removido — sistema unificado a una sola cuenta BuilderBot */}
@@ -237,9 +236,7 @@ function App({ currentUser, onLogout }) {
                     <ChequeoPanel addToast={addToast} />
                 )}
 
-                {activeView === 'remarketing' && (
-                    <RemarketingPanel addToast={addToast} />
-                )}
+
 
                 {activeView === 'recordatorios' && (
                     <RecordatoriosPanel addToast={addToast} />
