@@ -181,16 +181,16 @@ export async function fetchRecordatoriosMetrics(onProgress) {
         supabase
             .from('recepciones_visitas')
             .select('*')
+            .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
             .order('fecha', { ascending: true })
             .range(from, to)
     );
 
-    const chqData = filtrarPorTipoAgenda(data);
-    onProgress?.(`Procesando ${chqData.length} chequeos de ${data.length} registros...`);
+    onProgress?.(`Procesando ${data.length} chequeos...`);
 
     const hoy = new Date().toISOString().split('T')[0];
 
-    const processed = chqData.map(row => ({
+    const processed = data.map(row => ({
         ...row,
         asistencia_efectiva: row.asistencia
             ? row.asistencia
