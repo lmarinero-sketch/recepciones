@@ -38,15 +38,18 @@ function StatCard({ icon: Icon, label, value, sub, color, bg }) {
     );
 }
 
-function aggregate(data) {
+function aggregate(data, selectedYear) {
     const hoy = new Date().toISOString().split('T')[0];
     const byMonth = {};
     const osCounts = {};
     const medicoCounts = {};
     let totalPresentes = 0, totalAusentes = 0, totalPendientes = 0;
+    let filteredCount = 0;
 
     data.forEach(r => {
         if (!r.fecha) return;
+        if (selectedYear !== 'todos' && !r.fecha.startsWith(selectedYear)) return;
+        filteredCount++;
         const asis = r.asistencia_efectiva;
         if (asis === 'Presente') totalPresentes++;
         else if (asis === 'Ausente') totalAusentes++;
@@ -87,13 +90,14 @@ function aggregate(data) {
     const tasaGlobal = (totalPresentes + totalAusentes) > 0
         ? Math.round((totalPresentes / (totalPresentes + totalAusentes)) * 100) : 0;
 
-    return { months, topOS, topMedicos, totalPresentes, totalAusentes, totalPendientes, total: data.length, tasaGlobal };
+    return { months, topOS, topMedicos, totalPresentes, totalAusentes, totalPendientes, total: filteredCount, tasaGlobal };
 }
 
 export default function MetricasRecordatoriosPanel({ addToast }) {
     const [rawData, setRawData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [progress, setProgress] = useState('');
+    const [selectedYear, setSelectedYear] = useState('todos');
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -109,7 +113,16 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    const agg = useMemo(() => aggregate(rawData), [rawData]);
+    // Extraer años disponibles
+    const years = useMemo(() => {
+        const ys = new Set();
+        rawData.forEach(v => {
+            if (v.fecha) ys.add(v.fecha.substring(0, 4));
+        });
+        return [...ys].sort().reverse();
+    }, [rawData]);
+
+    const agg = useMemo(() => aggregate(rawData, selectedYear), [rawData, selectedYear]);
 
     if (loading) {
         return (
@@ -132,8 +145,8 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                         </div>
                         Métricas de Recordatorios
                     </h2>
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 50px' }}>
-                        Asistencia real vs. turnos agendados — Tabla <code>recepciones_visitas</code>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 50px', maxWidth: '600px', lineHeight: 1.5 }}>
+                        Analiza la efectividad del sistema comparando la <strong>Asistencia Real</strong> frente a todos los turnos dados. Te ayuda a entender cuántos pacientes efectivamente acuden a su cita después de recibir el recordatorio.
                     </p>
                 </div>
                 <button onClick={loadData} disabled={loading} style={{
@@ -141,6 +154,29 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                     background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px',
                     cursor: 'pointer', fontSize: '0.8rem', color: '#475569', fontWeight: 600,
                 }}><RefreshCw size={14} /> Actualizar</button>
+            </div>
+
+            {/* Year Tabs */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexShrink: 0, flexWrap: 'wrap' }}>
+                <button
+                    onClick={() => setSelectedYear('todos')}
+                    style={{
+                        padding: '6px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+                        fontSize: '0.78rem', fontWeight: 700, transition: 'all .15s',
+                        background: selectedYear === 'todos' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '#f1f5f9',
+                        color: selectedYear === 'todos' ? '#fff' : '#64748b',
+                        boxShadow: selectedYear === 'todos' ? '0 2px 8px rgba(245,158,11,.3)' : 'none',
+                    }}
+                >Todos los años</button>
+                {years.map(y => (
+                    <button key={y} onClick={() => setSelectedYear(y)} style={{
+                        padding: '6px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer',
+                        fontSize: '0.78rem', fontWeight: 700, transition: 'all .15s',
+                        background: selectedYear === y ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#f1f5f9',
+                        color: selectedYear === y ? '#fff' : '#64748b',
+                        boxShadow: selectedYear === y ? '0 2px 8px rgba(59,130,246,.3)' : 'none',
+                    }}>{y}</button>
+                ))}
             </div>
 
             {/* KPI Cards */}
@@ -157,9 +193,12 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
 
                 {/* Asistencia por Mes — Stacked Bar */}
                 <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
-                    <h3 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <TrendingUp size={18} color="#f59e0b" /> Asistencia por Mes
                     </h3>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 16px 0', maxWidth: '600px' }}>
+                        Desglosa el volumen total de turnos agendados por mes en tres estados: <strong style={{color: '#10b981'}}>Presentes</strong> (cumplieron), <strong style={{color: '#ef4444'}}>Ausentes</strong> (faltaron), y <strong style={{color: '#f59e0b'}}>Pendientes</strong> (citas futuras o sin resolver).
+                    </p>
                     {agg.months.length > 0 ? (
                         <div style={{ height: 280 }}>
                             <ResponsiveContainer width="100%" height="100%">
@@ -189,9 +228,12 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                 <div style={{ display: 'flex', gap: '20px' }}>
                     {/* Tasa trend */}
                     <div style={{ flex: 2, background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
-                        <h3 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
+                        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
                             Tasa de Asistencia por Mes (%)
                         </h3>
+                        <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 16px 0' }}>
+                            Evolución del porcentaje de cumplimiento (Presentes sobre el total de resueltos). 
+                        </p>
                         {agg.months.length > 0 ? (
                             <ResponsiveContainer width="100%" height={250}>
                                 <ComposedChart data={agg.months} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -275,10 +317,13 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
 
                 {/* Tabla Detalle */}
                 <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc' }}>
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: '#475569' }}>
                             Detalle Mes a Mes ({agg.months.length} meses)
                         </h3>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            Tabla que consolida de forma exacta los totales por estado.
+                        </div>
                     </div>
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
