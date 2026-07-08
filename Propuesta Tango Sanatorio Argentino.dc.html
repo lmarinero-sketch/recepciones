@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  doc-page:not(:defined){visibility:hidden}
+  doc-page{font-family:'Segoe UI', system-ui, -apple-system, Roboto, sans-serif; color:#2c3e50;}
+  doc-page p{text-wrap:pretty;}
+  a{color:#005794; text-decoration:underline;}
+  a:hover{color:#FF6B35;}
+</style>
+</helmet>
+<x-import component-from-global-scope="doc-page" from="./doc-page.js" size="a4" margin="0" hint-size="100%,100%">
+
+<!-- ============ PAGE 1 · COVER ============ -->
+<section data-screen-label="01 Portada" style="height:296mm; background:linear-gradient(135deg,#003E6B 0%,#005794 100%); color:#ffffff; padding:70px 62px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:space-between;">
+  <div style="font-size:44px; font-weight:700; letter-spacing:7px;">CORDELIA</div>
+  <div>
+    <div style="font-size:56px; font-weight:300; line-height:1.1;">Propuesta Técnica</div>
+    <div style="font-size:27px; font-weight:700; color:#FF6B35; margin-top:14px; line-height:1.25;">Integración de Comprobantes en Tango Gestión</div>
+    <p style="font-size:17px; max-width:56ch; margin:22px 0 0; line-height:1.6; color:#dbe8f2;">Automatización de carga masiva, prevalidación y generación de asientos contables automáticos.</p>
+  </div>
+  <div style="font-size:16px; line-height:2; border-top:2px solid rgba(255,255,255,.28); padding-top:22px;">
+    <div style="font-weight:700; font-size:18px;">Sanatorio Argentino</div>
+    <div>Inversión: <strong>$10.000.000 ARS</strong></div>
+    <div>Duración: 90 días · 3 etapas</div>
+  </div>
+</section>
+
+<!-- ============ PAGE 2 · SITUACIÓN ACTUAL ============ -->
+<section data-screen-label="02 Situación Actual" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <h2 style="color:#003E6B; font-size:30px; font-weight:700; margin:0 0 6px;">1. Situación Actual</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:26px;"></div>
+  <p style="font-size:15px; line-height:1.7; text-align:justify; margin:0 0 14px;">El Sanatorio Argentino recibe aproximadamente <strong>200 comprobantes mensuales</strong> de proveedores diversos en múltiples formatos: PDFs nativos (con CAE de AFIP), imágenes (tickets, facturas fotografiadas) y archivos mixtos sin estructura.</p>
+  <p style="font-size:15px; line-height:1.7; text-align:justify; margin:0 0 26px;">Hoy el proceso es <strong>100% manual</strong>. Cada comprobante se tipea línea por línea en Tango, lo que genera:</p>
+  <div style="display:flex; flex-direction:column; gap:16px;">
+    <div style="background:#fff8f0; border-left:4px solid #FF6B35; border-radius:6px; padding:18px 22px;"><span style="color:#FF6B35; font-weight:700; margin-right:8px;">✕</span><strong style="color:#003E6B;">Retrabajo contable:</strong> 15–20 horas mensuales del equipo administrativo.</div>
+    <div style="background:#fff8f0; border-left:4px solid #FF6B35; border-radius:6px; padding:18px 22px;"><span style="color:#FF6B35; font-weight:700; margin-right:8px;">✕</span><strong style="color:#003E6B;">Errores de imputación:</strong> 5–10% de comprobantes con cuentas incorrectas.</div>
+    <div style="background:#fff8f0; border-left:4px solid #FF6B35; border-radius:6px; padding:18px 22px;"><span style="color:#FF6B35; font-weight:700; margin-right:8px;">✕</span><strong style="color:#003E6B;">Demora en cierres:</strong> la contabilidad cierra 2–3 días después de recibir los comprobantes.</div>
+    <div style="background:#fff8f0; border-left:4px solid #FF6B35; border-radius:6px; padding:18px 22px;"><span style="color:#FF6B35; font-weight:700; margin-right:8px;">✕</span><strong style="color:#003E6B;">Falta de auditoría:</strong> sin trazabilidad de qué se importó ni cuándo.</div>
+  </div>
+</section>
+
+<!-- ============ PAGE 3 · SOLUCIÓN PROPUESTA ============ -->
+<section data-screen-label="03 Solución Propuesta" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <h2 style="color:#003E6B; font-size:30px; font-weight:700; margin:0 0 6px;">2. Solución Propuesta</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:26px;"></div>
+  <p style="font-size:15px; line-height:1.7; text-align:justify; margin:0 0 24px;">Proponemos una plataforma de automatización de punta a punta que captura, valida y carga los comprobantes directamente en Tango Gestión, generando los asientos contables sin intervención manual.</p>
+  <h3 style="color:#005794; font-size:18px; font-weight:700; margin:0 0 18px;">Componentes Principales</h3>
+  <div style="display:flex; flex-direction:column; gap:16px;">
+    <div style="background:#f0f8ff; border-left:4px solid #003E6B; border-radius:6px; padding:18px 22px;"><span style="color:#FF6B35; font-weight:700; margin-right:8px;">✓</span><strong style="color:#003E6B;">Captura automática:</strong> ARCA (facturas electrónicas) + OCR/IA (imágenes y PDFs).</div>
+    <div style="background:#f0f8ff; border-left:4px solid #003E6B; border-radius:6px; padding:18px 22px;"><span style="color:#FF6B35; font-weight:700; margin-right:8px;">✓</span><strong style="color:#003E6B;">Prevalidación inteligente:</strong> verificación de CUIT, detección de duplicados y clasificación de gastos.</div>
+    <div style="background:#f0f8ff; border-left:4px solid #003E6B; border-radius:6px; padding:18px 22px;"><span style="color:#FF6B35; font-weight:700; margin-right:8px;">✓</span><strong style="color:#003E6B;">Carga vía API REST:</strong> integración directa con Tango, sin interfaz manual.</div>
+    <div style="background:#f0f8ff; border-left:4px solid #003E6B; border-radius:6px; padding:18px 22px;"><span style="color:#FF6B35; font-weight:700; margin-right:8px;">✓</span><strong style="color:#003E6B;">Asientos contables automáticos:</strong> generación automática al ingresar cada comprobante.</div>
+    <div style="background:#f0f8ff; border-left:4px solid #003E6B; border-radius:6px; padding:18px 22px;"><span style="color:#FF6B35; font-weight:700; margin-right:8px;">✓</span><strong style="color:#003E6B;">Panel de auditoría:</strong> consulta en Tango Live con el estado de cada carga.</div>
+  </div>
+</section>
+
+<!-- ============ PAGE 4 · FLUJO + IMPACTO ============ -->
+<section data-screen-label="04 Flujo de Datos" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <h2 style="color:#003E6B; font-size:30px; font-weight:700; margin:0 0 6px;">3. Flujo de Datos</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:24px;"></div>
+  <div style="background:#f7f9fb; border:1px solid #cfe0ee; border-left:4px solid #003E6B; border-radius:6px; padding:22px; font-family:'Courier New', monospace; font-size:13px; color:#003E6B; line-height:1.9;">
+    ARCA / Imágenes&nbsp; →&nbsp; Extracción (IA/OCR)&nbsp; →&nbsp; Prevalidación (SQL)&nbsp; →<br>
+    API Tango&nbsp; →&nbsp; Módulo Compras&nbsp; →&nbsp; Asiento Contable Automático
+  </div>
+  <p style="font-size:13.5px; line-height:1.65; color:#5a6b7b; margin:14px 0 40px;">Cada comprobante recorre un pipeline determinístico: se extrae, se valida contra reglas de negocio, se carga por API y se contabiliza automáticamente, quedando auditable en cada paso.</p>
+
+  <h2 style="color:#003E6B; font-size:30px; font-weight:700; margin:0 0 6px;">4. Impacto en Tango Gestión</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:24px;"></div>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+    <div style="background:#f0f8ff; border-top:4px solid #FF6B35; border-radius:6px; padding:20px;"><div style="color:#003E6B; font-weight:700; font-size:16px; margin-bottom:6px;">API REST Funcional</div><div style="font-size:13.5px; line-height:1.6; color:#5a6b7b;">Carga de comprobantes sin interfaz manual, directamente al módulo Compras.</div></div>
+    <div style="background:#f0f8ff; border-top:4px solid #FF6B35; border-radius:6px; padding:20px;"><div style="color:#003E6B; font-weight:700; font-size:16px; margin-bottom:6px;">Parametrización Contable</div><div style="font-size:13.5px; line-height:1.6; color:#5a6b7b;">Proveedores, conceptos y modelos de asientos configurados en Tango.</div></div>
+    <div style="background:#f0f8ff; border-top:4px solid #FF6B35; border-radius:6px; padding:20px;"><div style="color:#003E6B; font-weight:700; font-size:16px; margin-bottom:6px;">Asientos Automáticos</div><div style="font-size:13.5px; line-height:1.6; color:#5a6b7b;">Generación contable en el ingreso del comprobante, sin doble carga.</div></div>
+    <div style="background:#f0f8ff; border-top:4px solid #FF6B35; border-radius:6px; padding:20px;"><div style="color:#003E6B; font-weight:700; font-size:16px; margin-bottom:6px;">Acceso SQL</div><div style="font-size:13.5px; line-height:1.6; color:#5a6b7b;">Consultas y tableros de auditoría sobre la base de datos de Tango.</div></div>
+  </div>
+</section>
+
+<!-- ============ PAGE 5 · PARAMETRIZACIÓN ============ -->
+<section data-screen-label="05 Parametrización" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <h2 style="color:#003E6B; font-size:28px; font-weight:700; margin:0 0 6px;">Parametrización Contable <span style="color:#FF6B35;">(40% del esfuerzo)</span></h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:24px;"></div>
+  <p style="font-size:15px; line-height:1.7; text-align:justify; margin:0 0 28px;">La base de una automatización confiable es una configuración contable rigurosa en Tango. Este trabajo concentra el 40% del esfuerzo del proyecto y define cómo cada comprobante se traduce en un asiento correcto.</p>
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; gap:18px; align-items:flex-start;"><div style="flex:0 0 34px; height:34px; border-radius:50%; background:#003E6B; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;">1</div><div><strong style="color:#003E6B;">Proveedores:</strong> ficha contable con cuenta a pagar y centro de costo.</div></div>
+    <div style="display:flex; gap:18px; align-items:flex-start;"><div style="flex:0 0 34px; height:34px; border-radius:50%; background:#003E6B; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;">2</div><div><strong style="color:#003E6B;">Conceptos de Gastos:</strong> Insumos Médicos, Servicios, Utilidades.</div></div>
+    <div style="display:flex; gap:18px; align-items:flex-start;"><div style="flex:0 0 34px; height:34px; border-radius:50%; background:#003E6B; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;">3</div><div><strong style="color:#003E6B;">Tipos de Comprobantes:</strong> FAC, NC, ND.</div></div>
+    <div style="display:flex; gap:18px; align-items:flex-start;"><div style="flex:0 0 34px; height:34px; border-radius:50%; background:#003E6B; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;">4</div><div><strong style="color:#003E6B;">Modelos de Asientos:</strong> Estándar, Con Percepción, Notas de Crédito.</div></div>
+    <div style="display:flex; gap:18px; align-items:flex-start;"><div style="flex:0 0 34px; height:34px; border-radius:50%; background:#003E6B; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;">5</div><div><strong style="color:#003E6B;">Parámetros Contables:</strong> activar "Genera asiento en el ingreso".</div></div>
+  </div>
+</section>
+
+<!-- ============ PAGE 6 · ETAPA 1 ============ -->
+<section data-screen-label="06 Etapa 1" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <div style="display:flex; align-items:center; gap:18px; margin-bottom:8px;">
+    <div style="flex:0 0 48px; height:48px; border-radius:50%; background:#FF6B35; color:#fff; font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center;">1</div>
+    <h2 style="color:#003E6B; font-size:27px; font-weight:700; margin:0;">ETAPA 1: Análisis &amp; Parametrización</h2>
+  </div>
+  <div style="width:72px; height:3px; background:#FF6B35; margin:0 0 26px 66px;"></div>
+  <div style="margin-left:66px;">
+    <div style="font-size:13px; font-weight:700; color:#005794; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Duración</div>
+    <p style="margin:0 0 22px; font-size:15px;">30 días</p>
+    <div style="font-size:13px; font-weight:700; color:#005794; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Deliverables</div>
+    <ul style="margin:0 0 22px; padding-left:20px; font-size:15px; line-height:1.9;">
+      <li>Auditoría del plan de cuentas Tango</li>
+      <li>Mapeo de proveedores → cuentas contables</li>
+      <li>Árbol de conceptos de gastos</li>
+      <li>Diseño de 3 modelos de asientos</li>
+      <li>Documento de configuración para Tango</li>
+    </ul>
+    <div style="font-size:13px; font-weight:700; color:#005794; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Resultado</div>
+    <p style="margin:0 0 26px; font-size:15px; line-height:1.7;">Tango queda parametrizado y documentado para recibir cargas automáticas con imputación correcta.</p>
+    <div style="background:#fff8f0; border-left:4px solid #FF6B35; border-radius:6px; padding:18px 22px; font-size:18px; font-weight:700; color:#003E6B;">Inversión: <span style="color:#FF6B35;">$3.000.000</span></div>
+  </div>
+</section>
+
+<!-- ============ PAGE 7 · ETAPA 2 ============ -->
+<section data-screen-label="07 Etapa 2" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <div style="display:flex; align-items:center; gap:18px; margin-bottom:8px;">
+    <div style="flex:0 0 48px; height:48px; border-radius:50%; background:#FF6B35; color:#fff; font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center;">2</div>
+    <h2 style="color:#003E6B; font-size:27px; font-weight:700; margin:0;">ETAPA 2: Desarrollo &amp; Integración</h2>
+  </div>
+  <div style="width:72px; height:3px; background:#FF6B35; margin:0 0 26px 66px;"></div>
+  <div style="margin-left:66px;">
+    <div style="font-size:13px; font-weight:700; color:#005794; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Duración</div>
+    <p style="margin:0 0 22px; font-size:15px;">35 días</p>
+    <div style="font-size:13px; font-weight:700; color:#005794; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Deliverables</div>
+    <ul style="margin:0 0 22px; padding-left:20px; font-size:15px; line-height:1.9;">
+      <li>Motor de captura (ARCA + OCR/IA)</li>
+      <li>Motor de prevalidación (SQL, CUIT, duplicados)</li>
+      <li>API de carga (integración REST Tango)</li>
+      <li>Dashboard de auditoría (Tango Live)</li>
+    </ul>
+    <div style="font-size:13px; font-weight:700; color:#005794; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Resultado</div>
+    <p style="margin:0 0 26px; font-size:15px; line-height:1.7;">Plataforma funcional capturando, validando y cargando comprobantes en Tango con trazabilidad completa.</p>
+    <div style="background:#fff8f0; border-left:4px solid #FF6B35; border-radius:6px; padding:18px 22px; font-size:18px; font-weight:700; color:#003E6B;">Inversión: <span style="color:#FF6B35;">$5.000.000</span></div>
+  </div>
+</section>
+
+<!-- ============ PAGE 8 · ETAPA 3 ============ -->
+<section data-screen-label="08 Etapa 3" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <div style="display:flex; align-items:center; gap:18px; margin-bottom:8px;">
+    <div style="flex:0 0 48px; height:48px; border-radius:50%; background:#FF6B35; color:#fff; font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center;">3</div>
+    <h2 style="color:#003E6B; font-size:27px; font-weight:700; margin:0;">ETAPA 3: Testing &amp; Capacitación</h2>
+  </div>
+  <div style="width:72px; height:3px; background:#FF6B35; margin:0 0 26px 66px;"></div>
+  <div style="margin-left:66px;">
+    <div style="font-size:13px; font-weight:700; color:#005794; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Duración</div>
+    <p style="margin:0 0 22px; font-size:15px;">25 días</p>
+    <div style="font-size:13px; font-weight:700; color:#005794; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Deliverables</div>
+    <ul style="margin:0 0 22px; padding-left:20px; font-size:15px; line-height:1.85;">
+      <li>Testing con 50 comprobantes reales</li>
+      <li>Validación de asientos contables</li>
+      <li>Ajustes post-testing</li>
+      <li>Capacitación 8 horas (4 sesiones)</li>
+      <li>Documentación y manual de usuario</li>
+      <li>Soporte 30 días post go-live</li>
+    </ul>
+    <div style="font-size:13px; font-weight:700; color:#005794; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Resultado</div>
+    <p style="margin:0 0 26px; font-size:15px; line-height:1.7;">Sistema validado en producción, equipo capacitado y operación estable con soporte acompañado.</p>
+    <div style="background:#fff8f0; border-left:4px solid #FF6B35; border-radius:6px; padding:18px 22px; font-size:18px; font-weight:700; color:#003E6B;">Inversión: <span style="color:#FF6B35;">$2.000.000</span></div>
+  </div>
+</section>
+
+<!-- ============ PAGE 9 · BENEFICIOS ESPERADOS ============ -->
+<section data-screen-label="09 Beneficios" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <h2 style="color:#003E6B; font-size:30px; font-weight:700; margin:0 0 6px;">5. Beneficios Esperados</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:28px;"></div>
+  <table style="width:100%; border-collapse:collapse; font-size:14px;">
+    <thead>
+      <tr style="background:#003E6B; color:#fff;">
+        <th style="text-align:left; padding:14px 16px; font-weight:700;">Métrica</th>
+        <th style="text-align:left; padding:14px 16px; font-weight:700;">Situación Actual</th>
+        <th style="text-align:left; padding:14px 16px; font-weight:700;">Post-Implementación</th>
+        <th style="text-align:left; padding:14px 16px; font-weight:700;">Mejora</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background:#ffffff;"><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef; font-weight:600; color:#003E6B;">Tiempo de carga manual</td><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef;">15–20 h/mes</td><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef;">2–3 h/mes</td><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef; color:#FF6B35; font-weight:700;">85% reducción</td></tr>
+      <tr style="background:#f9f9f9;"><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef; font-weight:600; color:#003E6B;">Errores de imputación</td><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef;">5–10%</td><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef;">&lt;1%</td><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef; color:#FF6B35; font-weight:700;">90% reducción</td></tr>
+      <tr style="background:#ffffff;"><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef; font-weight:600; color:#003E6B;">Tiempo de cierre contable</td><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef;">2–3 días</td><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef;">Mismo día</td><td style="padding:14px 16px; border-bottom:1px solid #e3e9ef; color:#FF6B35; font-weight:700;">Instantáneo</td></tr>
+      <tr style="background:#f9f9f9;"><td style="padding:14px 16px; font-weight:600; color:#003E6B;">Trazabilidad</td><td style="padding:14px 16px;">Nula</td><td style="padding:14px 16px;">Completa</td><td style="padding:14px 16px; color:#FF6B35; font-weight:700;">100% trazable</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ PAGE 10 · CRONOGRAMA ============ -->
+<section data-screen-label="10 Cronograma" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <h2 style="color:#003E6B; font-size:30px; font-weight:700; margin:0 0 6px;">6. Cronograma</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:10px;"></div>
+  <div style="font-size:15px; font-weight:700; color:#005794; letter-spacing:1px; margin-bottom:34px;">TOTAL: 90 DÍAS</div>
+  <div style="position:relative; padding-left:44px;">
+    <div style="position:absolute; left:9px; top:6px; bottom:6px; width:2px; background:#003E6B;"></div>
+    <div style="position:relative; margin-bottom:34px;">
+      <div style="position:absolute; left:-44px; top:2px; width:20px; height:20px; border-radius:50%; background:#FF6B35; box-shadow:0 0 0 4px #fff, 0 0 0 5px #FF6B35;"></div>
+      <div style="font-size:13px; font-weight:700; color:#FF6B35;">SEMANAS 1–4 · 30 días</div>
+      <div style="font-size:17px; font-weight:700; color:#003E6B; margin-top:2px;">Etapa 1 — Análisis &amp; Parametrización Contable</div>
+    </div>
+    <div style="position:relative; margin-bottom:34px;">
+      <div style="position:absolute; left:-44px; top:2px; width:20px; height:20px; border-radius:50%; background:#FF6B35; box-shadow:0 0 0 4px #fff, 0 0 0 5px #FF6B35;"></div>
+      <div style="font-size:13px; font-weight:700; color:#FF6B35;">SEMANAS 5–9 · 35 días</div>
+      <div style="font-size:17px; font-weight:700; color:#003E6B; margin-top:2px;">Etapa 2 — Desarrollo &amp; Integración</div>
+    </div>
+    <div style="position:relative; margin-bottom:34px;">
+      <div style="position:absolute; left:-44px; top:2px; width:20px; height:20px; border-radius:50%; background:#FF6B35; box-shadow:0 0 0 4px #fff, 0 0 0 5px #FF6B35;"></div>
+      <div style="font-size:13px; font-weight:700; color:#FF6B35;">SEMANAS 10–13 · 25 días</div>
+      <div style="font-size:17px; font-weight:700; color:#003E6B; margin-top:2px;">Etapa 3 — Testing &amp; Capacitación</div>
+    </div>
+    <div style="position:relative; background:#fff8f0; border-radius:8px; padding:16px 20px;">
+      <div style="position:absolute; left:-49px; top:14px; width:30px; height:30px; border-radius:50%; background:#FF6B35; box-shadow:0 0 0 4px #fff;"></div>
+      <div style="font-size:13px; font-weight:700; color:#FF6B35;">★ HITO CLAVE · DÍA 65</div>
+      <div style="font-size:15px; color:#003E6B; margin-top:4px; line-height:1.5;">Sistema cargando comprobantes automáticos a Tango en producción.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAGE 11 · ECONÓMICA 1 ============ -->
+<section data-screen-label="11 Propuesta Económica" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <h2 style="color:#003E6B; font-size:30px; font-weight:700; margin:0 0 6px;">7. Propuesta Económica</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:26px;"></div>
+  <div style="background:linear-gradient(135deg,#003E6B,#005794); color:#fff; border-radius:10px; padding:34px; text-align:center; margin-bottom:28px;">
+    <div style="font-size:15px; letter-spacing:3px; opacity:.85;">INVERSIÓN TOTAL</div>
+    <div style="font-size:48px; font-weight:700; margin-top:6px;">$10.000.000 ARS</div>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:16px;">
+    <div style="display:flex; align-items:stretch; background:#fff; border:1px solid #e3e9ef; border-left:4px solid #FF6B35; border-radius:6px; overflow:hidden;">
+      <div style="flex:1; padding:18px 22px;"><div style="color:#003E6B; font-weight:700; font-size:16px;">Etapa 1: Análisis y Parametrización Contable</div><div style="color:#5a6b7b; font-size:13.5px; margin-top:4px;">Auditoría, diseño de estructura y configuración Tango (30 días).</div></div>
+      <div style="flex:0 0 150px; background:#FF6B35; color:#fff; font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center;">$3.000.000</div>
+    </div>
+    <div style="display:flex; align-items:stretch; background:#fff; border:1px solid #e3e9ef; border-left:4px solid #FF6B35; border-radius:6px; overflow:hidden;">
+      <div style="flex:1; padding:18px 22px;"><div style="color:#003E6B; font-weight:700; font-size:16px;">Etapa 2: Desarrollo e Integración</div><div style="color:#5a6b7b; font-size:13.5px; margin-top:4px;">Desarrollo backend, OCR/IA, API REST e integración (35 días).</div></div>
+      <div style="flex:0 0 150px; background:#FF6B35; color:#fff; font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center;">$5.000.000</div>
+    </div>
+    <div style="display:flex; align-items:stretch; background:#fff; border:1px solid #e3e9ef; border-left:4px solid #FF6B35; border-radius:6px; overflow:hidden;">
+      <div style="flex:1; padding:18px 22px;"><div style="color:#003E6B; font-weight:700; font-size:16px;">Etapa 3: Testing, Ajustes y Capacitación</div><div style="color:#5a6b7b; font-size:13.5px; margin-top:4px;">Testing en producción, ajustes, capacitación 8h, documentación y soporte 30 días (25 días).</div></div>
+      <div style="flex:0 0 150px; background:#FF6B35; color:#fff; font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center;">$2.000.000</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAGE 12 · ECONÓMICA 2 + EQUIPO ============ -->
+<section data-screen-label="12 Pago y Equipo" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <h3 style="color:#005794; font-size:20px; font-weight:700; margin:0 0 18px;">Modelo de Pago</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:14px; margin-bottom:34px;">
+    <thead>
+      <tr style="background:#003E6B; color:#fff;">
+        <th style="text-align:left; padding:12px 16px;">Hito</th>
+        <th style="text-align:left; padding:12px 16px;">Porcentaje</th>
+        <th style="text-align:left; padding:12px 16px;">Monto</th>
+        <th style="text-align:left; padding:12px 16px;">Momento</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background:#fff;"><td style="padding:12px 16px; border-bottom:1px solid #e3e9ef; font-weight:600; color:#003E6B;">Firma de propuesta</td><td style="padding:12px 16px; border-bottom:1px solid #e3e9ef;">30%</td><td style="padding:12px 16px; border-bottom:1px solid #e3e9ef; font-weight:700; color:#FF6B35;">$3.000.000</td><td style="padding:12px 16px; border-bottom:1px solid #e3e9ef;">Inmediato</td></tr>
+      <tr style="background:#f9f9f9;"><td style="padding:12px 16px; border-bottom:1px solid #e3e9ef; font-weight:600; color:#003E6B;">Inicio Etapa 2</td><td style="padding:12px 16px; border-bottom:1px solid #e3e9ef;">50%</td><td style="padding:12px 16px; border-bottom:1px solid #e3e9ef; font-weight:700; color:#FF6B35;">$5.000.000</td><td style="padding:12px 16px; border-bottom:1px solid #e3e9ef;">Día 31</td></tr>
+      <tr style="background:#fff;"><td style="padding:12px 16px; font-weight:600; color:#003E6B;">Go-live en producción</td><td style="padding:12px 16px;">20%</td><td style="padding:12px 16px; font-weight:700; color:#FF6B35;">$2.000.000</td><td style="padding:12px 16px;">Día 66</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="color:#005794; font-size:20px; font-weight:700; margin:0 0 16px;">Incluido en la Propuesta</h3>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:34px;">
+    <div style="background:#f0f8ff; border:1px solid #cfe0ee; border-radius:6px; padding:12px 16px; font-size:13.5px;"><span style="color:#FF6B35; font-weight:700; margin-right:6px;">✓</span>Desarrollo e integración completa</div>
+    <div style="background:#f0f8ff; border:1px solid #cfe0ee; border-radius:6px; padding:12px 16px; font-size:13.5px;"><span style="color:#FF6B35; font-weight:700; margin-right:6px;">✓</span>Infraestructura básica (30 días post go-live)</div>
+    <div style="background:#f0f8ff; border:1px solid #cfe0ee; border-radius:6px; padding:12px 16px; font-size:13.5px;"><span style="color:#FF6B35; font-weight:700; margin-right:6px;">✓</span>Documentación técnica y manual de usuario</div>
+    <div style="background:#f0f8ff; border:1px solid #cfe0ee; border-radius:6px; padding:12px 16px; font-size:13.5px;"><span style="color:#FF6B35; font-weight:700; margin-right:6px;">✓</span>Capacitación de 8 horas (4 sesiones)</div>
+    <div style="background:#f0f8ff; border:1px solid #cfe0ee; border-radius:6px; padding:12px 16px; font-size:13.5px; grid-column:1 / -1;"><span style="color:#FF6B35; font-weight:700; margin-right:6px;">✓</span>Soporte durante 30 días post go-live</div>
+  </div>
+
+  <h2 style="color:#003E6B; font-size:26px; font-weight:700; margin:0 0 6px;">8. Equipo y Responsabilidades</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:18px;"></div>
+  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; font-size:13px;">
+    <div><div style="color:#003E6B; font-weight:700; margin-bottom:6px;">Cordelia</div><ul style="margin:0; padding-left:18px; line-height:1.7;"><li>Desarrollo e integración</li><li>OCR/IA y API REST</li><li>Capacitación y soporte</li></ul></div>
+    <div><div style="color:#003E6B; font-weight:700; margin-bottom:6px;">Sanatorio Argentino</div><ul style="margin:0; padding-left:18px; line-height:1.7;"><li>Acceso a Tango y datos</li><li>Validación contable</li><li>Punto de contacto interno</li></ul></div>
+    <div><div style="color:#003E6B; font-weight:700; margin-bottom:6px;">Axoft</div><ul style="margin:0; padding-left:18px; line-height:1.7;"><li>Soporte de plataforma Tango</li><li>Habilitación de API</li><li>Actualizaciones de producto</li></ul></div>
+  </div>
+</section>
+
+<!-- ============ PAGE 13 · RIESGOS + PRÓXIMOS PASOS ============ -->
+<section data-screen-label="13 Riesgos y Próximos Pasos" style="break-before:page; padding:52px 56px; box-sizing:border-box;">
+  <h2 style="color:#003E6B; font-size:30px; font-weight:700; margin:0 0 6px;">9. Riesgos y Mitigaciones</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:24px;"></div>
+  <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:38px;">
+    <thead>
+      <tr style="background:#003E6B; color:#fff;">
+        <th style="text-align:left; padding:11px 14px;">Riesgo</th>
+        <th style="text-align:left; padding:11px 14px;">Probabilidad</th>
+        <th style="text-align:left; padding:11px 14px;">Mitigación</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background:#fff;"><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef; font-weight:600; color:#003E6B;">Calidad variable de imágenes/PDFs</td><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef;">Media</td><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef;">OCR con IA + revisión manual de excepciones</td></tr>
+      <tr style="background:#f9f9f9;"><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef; font-weight:600; color:#003E6B;">Cambios en la API de Tango</td><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef;">Baja</td><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef;">Versionado y pruebas de regresión</td></tr>
+      <tr style="background:#fff;"><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef; font-weight:600; color:#003E6B;">Retraso en la entrega de datos contables</td><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef;">Media</td><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef;">Cronograma con hitos y responsables definidos</td></tr>
+      <tr style="background:#f9f9f9;"><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef; font-weight:600; color:#003E6B;">Resistencia al cambio del equipo</td><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef;">Media</td><td style="padding:11px 14px; border-bottom:1px solid #e3e9ef;">Capacitación 8h y soporte de 30 días</td></tr>
+      <tr style="background:#fff;"><td style="padding:11px 14px; font-weight:600; color:#003E6B;">Comprobantes con formatos no previstos</td><td style="padding:11px 14px;">Baja</td><td style="padding:11px 14px;">Motor extensible y catálogo de excepciones</td></tr>
+    </tbody>
+  </table>
+
+  <h2 style="color:#003E6B; font-size:30px; font-weight:700; margin:0 0 6px;">10. Próximos Pasos</h2>
+  <div style="width:72px; height:3px; background:#FF6B35; margin-bottom:22px;"></div>
+  <div style="display:flex; flex-direction:column; gap:16px;">
+    <div style="display:flex; gap:16px; align-items:center;"><div style="flex:0 0 32px; height:32px; border-radius:50%; background:#FF6B35; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;">1</div><div style="font-size:15px;">Aprobación de la propuesta y firma.</div></div>
+    <div style="display:flex; gap:16px; align-items:center;"><div style="flex:0 0 32px; height:32px; border-radius:50%; background:#FF6B35; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;">2</div><div style="font-size:15px;">Reunión de kickoff y acceso a los entornos de Tango.</div></div>
+    <div style="display:flex; gap:16px; align-items:center;"><div style="flex:0 0 32px; height:32px; border-radius:50%; background:#FF6B35; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;">3</div><div style="font-size:15px;">Inicio de la auditoría del plan de cuentas (Etapa 1).</div></div>
+    <div style="display:flex; gap:16px; align-items:center;"><div style="flex:0 0 32px; height:32px; border-radius:50%; background:#FF6B35; color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center;">4</div><div style="font-size:15px;">Definición del calendario de capacitación.</div></div>
+  </div>
+</section>
+
+<!-- ============ PAGE 14 · CONTACTO ============ -->
+<section data-screen-label="14 Contacto" style="break-before:page; height:296mm; background:linear-gradient(135deg,#003E6B 0%,#005794 100%); color:#fff; padding:60px; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
+  <div style="font-size:48px; font-weight:700; letter-spacing:8px;">CORDELIA</div>
+  <div style="font-size:16px; color:#dbe8f2; margin-top:8px; letter-spacing:1px;">Soluciones en IA &amp; Digital Transformation</div>
+  <div style="width:64px; height:3px; background:#FF6B35; margin:34px 0;"></div>
+  <div style="font-size:22px; font-weight:700;">Pablo Vera</div>
+  <div style="font-size:15px; color:#dbe8f2; margin-top:4px;">Consultor · IA &amp; Digital Transformation</div>
+  <div style="font-size:16px; line-height:2; margin-top:26px;">
+    <div>✉&nbsp; <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0d7d6c6f61624d6e627f696861646c236e6260236c7f">[email&#160;protected]</a></div>
+    <div>☎&nbsp; (264) 4414270</div>
+  </div>
+  <div style="font-size:13px; color:#aecbe2; margin-top:44px; line-height:1.8;">
+    Propuesta válida por 30 días desde la fecha de emisión.<br>
+    Sanatorio Argentino · JULIO 2026</div>
+</section>
+
+</x-import>
+</x-dc>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script></body>
+</html>

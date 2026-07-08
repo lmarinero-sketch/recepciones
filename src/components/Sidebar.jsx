@@ -3,11 +3,13 @@ import {
     Settings, PanelLeftClose, PanelLeft,
     ChevronDown, Home, MessageSquareText, MessageCircle,
     Brain, HeartPulse, RefreshCw, BarChart3, Bell, ClipboardCheck,
+    Building2, FileText, DollarSign, LayoutDashboard, UserPlus, FolderClock, Megaphone,
 } from 'lucide-react';
 
 export default function Sidebar({ collapsed, onToggle, activeView, onViewChange, unreadMessageCount = 0 }) {
     const [mensajeriaOpen, setMensajeriaOpen] = useState(false);
     const [preventivaOpen, setPreventivaOpen] = useState(false);
+    const [alquileresOpen, setAlquileresOpen] = useState(false);
 
     const mensajeriaSubItems = [
         { id: 'mensajeria', label: 'Chat Central', icon: MessageCircle },
@@ -26,6 +28,18 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
     ];
 
     const isPreventivaActive = preventivaSubItems.some(i => activeView === i.id);
+
+    const alquileresSubItems = [
+        { id: 'ocupacion', label: 'Ocupación', icon: Building2 },
+        { id: 'novedades', label: 'Novedades', icon: FileText },
+        { id: 'liquidacion', label: 'Liquidación', icon: DollarSign },
+        { id: 'dashboard_alquileres', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'onboarding', label: 'Incorporación', icon: UserPlus },
+        { id: 'historial_periodos', label: 'Historial', icon: FolderClock },
+        { id: 'catalogo', label: 'Catálogo', icon: Megaphone },
+    ];
+
+    const isAlquileresActive = alquileresSubItems.some(i => activeView === i.id);
 
     // ── Smooth Accordion component ──
     function AccordionContent({ isOpen, children }) {
@@ -209,6 +223,15 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
                     setOpen: setPreventivaOpen,
                     isGroupActive: isPreventivaActive,
                     subItems: preventivaSubItems,
+                })}
+
+                {renderGroup({
+                    label: 'Alquileres',
+                    icon: Building2,
+                    isOpen: alquileresOpen,
+                    setOpen: setAlquileresOpen,
+                    isGroupActive: isAlquileresActive,
+                    subItems: alquileresSubItems,
                 })}
 
                 {!collapsed && (

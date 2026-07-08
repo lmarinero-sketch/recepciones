@@ -123,50 +123,62 @@ const GUIDE_SECTIONS = [
 function WorkflowDiagram() {
     return (
         <div style={{
-            background: '#fff', borderRadius: '16px', border: '1px solid #E2E8F0',
-            padding: '24px', marginBottom: '24px',
+            background: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+            borderRadius: '24px', border: '1px solid rgba(255,255,255,0.8)',
+            padding: '32px', marginBottom: '32px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,1)',
+            position: 'relative', overflow: 'hidden'
         }}>
-            <h3 style={{ margin: '0 0 6px', fontSize: '0.95rem', fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={18} color="#F59E0B" /> Diagrama de Flujo del Sistema
-            </h3>
-            <p style={{ margin: '0 0 20px', fontSize: '0.78rem', color: '#64748B' }}>
-                El recorrido de cada paciente dentro del sistema de salud preventiva
-            </p>
-            {/* Visual flow */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0', justifyContent: 'center', flexWrap: 'wrap' }}>
-                {WORKFLOW_STEPS.map((step, i) => {
-                    const Icon = step.icon;
-                    return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
-                            <div style={{
-                                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                padding: '16px 20px', borderRadius: '14px', minWidth: '150px',
-                                background: `linear-gradient(135deg, ${step.color}08, ${step.color}15)`,
-                                border: `2px solid ${step.color}30`,
-                                transition: 'all .2s',
-                            }}
-                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 6px 20px ${step.color}20`; }}
-                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-                            >
+            <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(245, 158, 11, 0.08) 0%, transparent 70%)', filter: 'blur(40px)', zIndex: 0 }} />
+            
+            <div style={{ position: 'relative', zIndex: 1 }}>
+                <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 800, color: '#1E293B', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ padding: '8px', background: 'linear-gradient(135deg, rgba(252,211,77,0.3), rgba(245,158,11,0.1))', borderRadius: '10px', color: '#D97706' }}>
+                        <Zap size={20} />
+                    </div>
+                    Diagrama de Flujo del Sistema
+                </h3>
+                <p style={{ margin: '0 0 24px', fontSize: '0.82rem', color: '#64748B', fontWeight: 500 }}>
+                    El recorrido de cada paciente dentro del sistema de salud preventiva
+                </p>
+                {/* Visual flow */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    {WORKFLOW_STEPS.map((step, i) => {
+                        const Icon = step.icon;
+                        return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
                                 <div style={{
-                                    width: '44px', height: '44px', borderRadius: '12px',
-                                    background: `linear-gradient(135deg, ${step.color}, ${step.color}CC)`,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    marginBottom: '8px', boxShadow: `0 4px 12px ${step.color}30`,
-                                }}>
-                                    <Icon size={20} color="#fff" />
+                                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                    padding: '20px 24px', borderRadius: '18px', minWidth: '170px',
+                                    background: 'rgba(255,255,255,0.6)',
+                                    border: '1px solid rgba(255,255,255,0.9)',
+                                    boxShadow: '0 8px 20px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,1)',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    cursor: 'default',
+                                }}
+                                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)'; e.currentTarget.style.boxShadow = `0 15px 35px ${step.color}25, inset 0 1px 0 rgba(255,255,255,1)`; }}
+                                    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,1)'; }}
+                                >
+                                    <div style={{
+                                        width: '48px', height: '48px', borderRadius: '14px',
+                                        background: `linear-gradient(135deg, ${step.color}, ${step.color}DD)`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        marginBottom: '12px', boxShadow: `0 8px 16px ${step.color}40, inset 0 2px 4px rgba(255,255,255,0.3)`,
+                                    }}>
+                                        <Icon size={22} color="#fff" />
+                                    </div>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1E293B', letterSpacing: '-0.01em' }}>{step.label}</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#64748B', textAlign: 'center', marginTop: '4px', lineHeight: 1.4, fontWeight: 500 }}>{step.desc}</span>
                                 </div>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1E293B' }}>{step.label}</span>
-                                <span style={{ fontSize: '0.68rem', color: '#64748B', textAlign: 'center', marginTop: '2px', lineHeight: 1.3 }}>{step.desc}</span>
+                                {i < WORKFLOW_STEPS.length - 1 && (
+                                    <div style={{ padding: '0 10px', color: '#CBD5E1', transform: 'scale(1.2)' }}>
+                                        <ArrowRight size={24} />
+                                    </div>
+                                )}
                             </div>
-                            {i < WORKFLOW_STEPS.length - 1 && (
-                                <div style={{ padding: '0 6px', color: '#CBD5E1' }}>
-                                    <ArrowRight size={22} />
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
@@ -279,35 +291,45 @@ function GuideSection({ section }) {
 
     return (
         <div style={{
-            background: '#fff', borderRadius: '16px',
-            border: '1px solid #E2E8F0', overflow: 'hidden',
-            transition: 'box-shadow 0.2s',
-            boxShadow: expanded ? '0 4px 20px rgba(0,0,0,0.06)' : '0 1px 3px rgba(0,0,0,0.04)',
+            background: 'rgba(255, 255, 255, 0.65)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            borderRadius: '20px', border: '1px solid rgba(255,255,255,0.9)', overflow: 'hidden',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: expanded ? '0 12px 35px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,1)' : '0 4px 15px rgba(0,0,0,0.02), inset 0 1px 0 rgba(255,255,255,1)',
+            transform: expanded ? 'translateY(-2px)' : 'translateY(0)'
         }}>
             <button
                 onClick={() => setExpanded(p => !p)}
                 style={{
-                    display: 'flex', alignItems: 'center', gap: '14px',
-                    width: '100%', padding: '18px 22px', border: 'none',
-                    background: expanded ? section.bg : '#fff',
+                    display: 'flex', alignItems: 'center', gap: '16px',
+                    width: '100%', padding: '20px 24px', border: 'none',
+                    background: expanded ? 'rgba(255,255,255,0.8)' : 'transparent',
                     cursor: 'pointer', textAlign: 'left', transition: 'background 0.2s',
                 }}
             >
                 <div style={{
-                    width: '42px', height: '42px', borderRadius: '12px',
-                    background: `${section.color}15`,
+                    width: '48px', height: '48px', borderRadius: '14px',
+                    background: `linear-gradient(135deg, ${section.color}15, ${section.color}05)`,
+                    border: `1px solid ${section.color}30`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    boxShadow: `0 4px 10px ${section.color}10, inset 0 2px 4px rgba(255,255,255,0.5)`
                 }}>
-                    <Icon size={20} style={{ color: section.color }} />
+                    <Icon size={22} style={{ color: section.color }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1E293B', margin: 0 }}>{section.title}</h3>
-                    <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '2px 0 0' }}>{section.description}</p>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#1E293B', margin: 0, letterSpacing: '-0.01em' }}>{section.title}</h3>
+                    <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '4px 0 0', fontWeight: 500 }}>{section.description}</p>
                 </div>
-                <ChevronDown size={16} style={{
-                    transition: 'transform 0.2s', color: '#94A3B8',
-                    transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                }} />
+                <div style={{
+                    width: '32px', height: '32px', borderRadius: '10px',
+                    background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.05)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.02)',
+                }}>
+                    <ChevronDown size={18} style={{
+                        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)', color: '#64748B',
+                        transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    }} />
+                </div>
             </button>
 
             {expanded && (
@@ -316,7 +338,9 @@ function GuideSection({ section }) {
                         <div style={{
                             borderRadius: '12px', overflow: 'hidden',
                             border: '1px solid #E2E8F0', marginBottom: '16px',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                            borderRadius: '16px', overflow: 'hidden',
+                            border: '1px solid rgba(226, 232, 240, 0.8)', marginBottom: '20px',
+                            boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
                         }}>
                             <img
                                 src={section.image}
@@ -341,25 +365,36 @@ export default function HomePanel() {
     const saludo = hora < 12 ? 'Buenos días' : hora < 18 ? 'Buenas tardes' : 'Buenas noches';
 
     return (
-        <div className="content no-print" style={{ maxWidth: '960px', margin: '0 auto', paddingBottom: '40px' }}>
+        <div className="content no-print" style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '60px' }}>
+            {/* Elementos de fondo global para Antigravity */}
+            <div style={{ position: 'fixed', top: '20%', right: '5%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%)', filter: 'blur(50px)', zIndex: 0, pointerEvents: 'none' }} />
+            <div style={{ position: 'fixed', bottom: '10%', left: '5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, transparent 70%)', filter: 'blur(60px)', zIndex: 0, pointerEvents: 'none' }} />
+            
             {/* Hero Banner */}
             <div className="animate-fade-in" style={{
-                background: 'linear-gradient(135deg, #1E40AF 0%, #3B82F6 50%, #60A5FA 100%)',
-                borderRadius: '20px', padding: '36px 40px', color: '#fff',
-                marginBottom: '24px', position: 'relative', overflow: 'hidden',
+                background: 'linear-gradient(135deg, rgba(30, 64, 175, 0.85) 0%, rgba(59, 130, 246, 0.8) 50%, rgba(96, 165, 250, 0.85) 100%)',
+                backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+                borderRadius: '28px', padding: '40px 48px', color: '#fff',
+                marginBottom: '32px', position: 'relative', overflow: 'hidden',
+                border: '1px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 20px 50px rgba(30,64,175,0.15), inset 0 1px 0 rgba(255,255,255,0.4)',
+                zIndex: 1,
             }}>
-                <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '140px', height: '140px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
-                <div style={{ position: 'absolute', bottom: '-20px', right: '80px', width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)', filter: 'blur(10px)' }} />
+                <div style={{ position: 'absolute', bottom: '-20px', right: '120px', width: '120px', height: '120px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)', filter: 'blur(5px)' }} />
+                
                 <div style={{ position: 'relative', zIndex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                        <Home size={28} style={{ opacity: 0.9 }} />
-                        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>{saludo} 👋</h1>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+                        <div style={{ padding: '10px', background: 'rgba(255,255,255,0.15)', borderRadius: '14px', backdropFilter: 'blur(10px)' }}>
+                            <Home size={30} style={{ opacity: 1, color: '#fff' }} />
+                        </div>
+                        <h1 style={{ fontSize: '1.8rem', fontWeight: 800, margin: 0, textShadow: '0 2px 10px rgba(0,0,0,0.1)', letterSpacing: '-0.02em' }}>{saludo} 👋</h1>
                     </div>
-                    <p style={{ fontSize: '1rem', opacity: 0.9, marginBottom: '16px', maxWidth: '650px', lineHeight: 1.6 }}>
-                        Bienvenido al <strong>Sistema de Recepciones</strong> del Sanatorio Argentino.
+                    <p style={{ fontSize: '1.05rem', opacity: 0.95, marginBottom: '24px', maxWidth: '700px', lineHeight: 1.6, textShadow: '0 1px 4px rgba(0,0,0,0.1)', fontWeight: 500 }}>
+                        Bienvenido al <strong style={{ fontWeight: 800, color: '#fff' }}>Sistema de Recepciones</strong> del Sanatorio Argentino.
                         Gestioná chequeos preventivos, mensajería con pacientes y seguimiento de turnos desde un solo lugar.
                     </p>
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                         {[
                             { icon: HeartPulse, label: 'Chequeos', sub: 'Prevención' },
                             { icon: MessageCircle, label: 'Mensajería', sub: 'WhatsApp' },
@@ -368,12 +403,19 @@ export default function HomePanel() {
                             const Icon = item.icon;
                             return (
                                 <div key={i} style={{
-                                    display: 'flex', alignItems: 'center', gap: '8px',
-                                    padding: '8px 14px', borderRadius: '10px',
-                                    background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)',
-                                    fontSize: '0.8rem', fontWeight: 600,
-                                }}>
-                                    <Icon size={15} />
+                                    display: 'flex', alignItems: 'center', gap: '10px',
+                                    padding: '10px 18px', borderRadius: '14px',
+                                    background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(12px)',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    fontSize: '0.85rem', fontWeight: 700,
+                                    boxShadow: '0 4px 15px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.1)',
+                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    cursor: 'default',
+                                }}
+                                onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.background = 'rgba(255,255,255,0.25)'; }}
+                                onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
+                                >
+                                    <Icon size={16} />
                                     <span>{item.label}</span>
                                     <span style={{ fontSize: '0.65rem', opacity: 0.7, padding: '2px 6px', background: 'rgba(255,255,255,0.15)', borderRadius: '6px' }}>{item.sub}</span>
                                 </div>

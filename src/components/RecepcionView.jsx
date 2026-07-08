@@ -339,36 +339,38 @@ export default function RecepcionView() {
     return (
         <div style={{
             minHeight: '100vh',
-            background: '#E8EFF7',
-            backgroundImage: 'url(/SANARG2021_fondo.webp)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundAttachment: 'fixed',
+            background: 'linear-gradient(135deg, #F0F4F8 0%, #E2E8F0 100%)',
             fontFamily: "'Inter', -apple-system, sans-serif",
             position: 'relative',
+            overflow: 'hidden',
         }}>
+            {/* Elementos flotantes de fondo para efecto de gravedad cero */}
+            <div style={{ position: 'fixed', top: '-10%', right: '-5%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%)', filter: 'blur(60px)', zIndex: 0, pointerEvents: 'none' }} />
+            <div style={{ position: 'fixed', bottom: '-20%', left: '-10%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, transparent 70%)', filter: 'blur(80px)', zIndex: 0, pointerEvents: 'none' }} />
+            
             {/* Background overlay */}
             <div style={{
                 position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                background: 'rgba(241, 245, 249, 0.88)',
-                backdropFilter: 'blur(2px)',
+                background: 'rgba(255, 255, 255, 0.4)',
+                backdropFilter: 'blur(40px)',
+                WebkitBackdropFilter: 'blur(40px)',
                 zIndex: 0,
             }} />
 
             {/* === HEADER === */}
             <header style={{
-                background: 'rgba(255, 255, 255, 0.85)',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                borderBottom: '1px solid rgba(255,255,255,0.3)',
-                padding: '10px 24px',
+                background: 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                borderBottom: '1px solid rgba(255,255,255,0.8)',
+                padding: '16px 32px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 position: 'sticky',
                 top: 0,
                 zIndex: 100,
-                boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.03), inset 0 -1px 0 rgba(255,255,255,0.5)',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <img
@@ -439,15 +441,16 @@ export default function RecepcionView() {
 
             {/* === TOOLBAR === */}
             <div style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '10px 24px',
-                background: 'rgba(255, 255, 255, 0.7)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                borderBottom: '1px solid rgba(255,255,255,0.3)',
+                display: 'flex', alignItems: 'center', gap: '16px',
+                padding: '16px 32px',
+                background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.2))',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                borderBottom: '1px solid rgba(255,255,255,0.6)',
                 flexWrap: 'wrap',
                 position: 'relative',
                 zIndex: 50,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
             }}>
                 {/* Date tabs */}
                 <div style={{
@@ -553,16 +556,26 @@ export default function RecepcionView() {
                                     style={{
                                         display: 'flex',
                                         background: suspended
-                                            ? 'rgba(254, 242, 242, 0.85)'
-                                            : 'rgba(255, 255, 255, 0.75)',
-                                        backdropFilter: 'blur(12px)',
-                                        WebkitBackdropFilter: 'blur(12px)',
-                                        borderRadius: '16px',
-                                        border: '1px solid rgba(255,255,255,0.4)',
+                                            ? 'rgba(254, 242, 242, 0.75)'
+                                            : 'rgba(255, 255, 255, 0.65)',
+                                        backdropFilter: 'blur(20px)',
+                                        WebkitBackdropFilter: 'blur(20px)',
+                                        borderRadius: '20px',
+                                        border: '1px solid rgba(255,255,255,0.8)',
                                         overflow: 'hidden',
-                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                                         opacity: suspended ? 0.85 : 1,
-                                        boxShadow: '0 2px 12px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.02)',
+                                        boxShadow: '0 10px 30px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,1)',
+                                        position: 'relative',
+                                        transform: 'translateY(0)',
+                                    }}
+                                    onMouseOver={e => { 
+                                        e.currentTarget.style.transform = 'translateY(-4px) scale(1.005)'; 
+                                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,1)'; 
+                                    }}
+                                    onMouseOut={e => { 
+                                        e.currentTarget.style.transform = 'translateY(0) scale(1)'; 
+                                        e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,1)'; 
                                     }}
                                 >
                                     {/* === LEFT ACCENT BAR === */}
@@ -594,10 +607,11 @@ export default function RecepcionView() {
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
                                                 <span style={{
-                                                    fontWeight: 700, fontSize: '0.95rem',
+                                                    fontWeight: 800, fontSize: '1.05rem',
                                                     color: suspended ? '#B91C1C' : '#0D3B66',
                                                     textDecoration: suspended ? 'line-through' : 'none',
-                                                    letterSpacing: '-0.3px',
+                                                    letterSpacing: '-0.02em',
+                                                    textShadow: '0 1px 2px rgba(0,0,0,0.05)'
                                                 }}>
                                                     {surgery.nombre}
                                                 </span>

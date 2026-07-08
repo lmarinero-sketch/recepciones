@@ -18,6 +18,13 @@ import RecordatoriosPanel from './components/RecordatoriosPanel.jsx';
 import MetricasRecordatoriosPanel from './components/MetricasRecordatoriosPanel.jsx';
 import EncuestaCalidadPanel from './components/EncuestaCalidadPanel.jsx';
 import MetricasEncuestasPanel from './components/MetricasEncuestasPanel.jsx';
+import OcupacionPanel from './components/OcupacionPanel.jsx';
+import NovedadesPanel from './components/NovedadesPanel.jsx';
+import LiquidacionPanel from './components/LiquidacionPanel.jsx';
+import DashboardAlquileresPanel from './components/DashboardAlquileresPanel.jsx';
+import HistorialPeriodosPanel from './components/HistorialPeriodosPanel.jsx';
+import OnboardingPanel from './components/OnboardingPanel.jsx';
+import CatalogoPanel from './components/CatalogoPanel.jsx';
 import './App.css';
 
 function AppRoot() {
@@ -155,7 +162,7 @@ function App({ currentUser, onLogout }) {
                                 <span key={`s-${i}`} className="topbar__wave-letter" style={{ animationDelay: `${(12 + i) * 0.08}s` }}>{char === ' ' ? '\u00A0' : char}</span>
                             ))}
                         </h1>
-                        <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Marketing — Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'metricas' ? 'Métricas de Chequeos' : activeView === 'recordatorios' ? 'Recordatorios de Turnos' : activeView === 'metricas_recordatorios' ? 'Métricas de Recordatorios' : activeView === 'encuestas_calidad' ? 'Encuestas de Calidad — Post Chequeo' : activeView === 'metricas_encuestas' ? 'Métricas de Encuestas' : 'Centro de Mensajería'}</span>
+                        <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Marketing — Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'metricas' ? 'Métricas de Chequeos' : activeView === 'recordatorios' ? 'Recordatorios de Turnos' : activeView === 'metricas_recordatorios' ? 'Métricas de Recordatorios' : activeView === 'encuestas_calidad' ? 'Encuestas de Calidad — Post Chequeo' : activeView === 'metricas_encuestas' ? 'Métricas de Encuestas' : activeView === 'ocupacion' ? 'Alquileres — Ocupación de Consultorios' : activeView === 'novedades' ? 'Alquileres — Novedades' : activeView === 'liquidacion' ? 'Alquileres — Liquidación' : activeView === 'dashboard_alquileres' ? 'Alquileres — Dashboard' : activeView === 'onboarding' ? 'Alquileres — Incorporación de Médicos' : activeView === 'historial_periodos' ? 'Alquileres — Historial' : activeView === 'catalogo' ? 'Alquileres — Catálogo Comercial' : 'Centro de Mensajería'}</span>
                     </div>
                     
                     {/* WhatsAppLineStatus removido — sistema unificado a una sola cuenta BuilderBot */}
@@ -260,6 +267,34 @@ function App({ currentUser, onLogout }) {
 
                 {activeView === 'configuracion' && (
                     <ConfigPanel addToast={addToast} />
+                )}
+
+                {activeView === 'ocupacion' && (
+                    <OcupacionPanel addToast={addToast} />
+                )}
+
+                {activeView === 'novedades' && (
+                    <NovedadesPanel addToast={addToast} />
+                )}
+
+                {activeView === 'liquidacion' && (
+                    <LiquidacionPanel addToast={addToast} />
+                )}
+
+                {activeView === 'dashboard_alquileres' && (
+                    <DashboardAlquileresPanel addToast={addToast} />
+                )}
+
+                {activeView === 'historial_periodos' && (
+                    <HistorialPeriodosPanel addToast={addToast} />
+                )}
+
+                {activeView === 'onboarding' && (
+                    <OnboardingPanel addToast={addToast} />
+                )}
+
+                {activeView === 'catalogo' && (
+                    <CatalogoPanel addToast={addToast} />
                 )}
             </main>
 

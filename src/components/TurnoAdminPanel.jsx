@@ -196,7 +196,12 @@ export default function TurnoAdminPanel({ addToast, currentUser }) {
     }
 
     return (
-        <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+        <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto', position: 'relative', minHeight: '100vh', overflow: 'hidden' }}>
+            {/* Global Animated Backgrounds */}
+            <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%)', filter: 'blur(60px)', zIndex: 0, pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', bottom: '-20%', left: '-10%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, transparent 70%)', filter: 'blur(80px)', zIndex: 0, pointerEvents: 'none' }} />
+            
+            <div style={{ position: 'relative', zIndex: 1 }}>
             {/* ═══ HEADER + MÉTRICAS RÁPIDAS ═══ */}
             <div style={s.header}>
                 <div style={s.headerLeft}>
@@ -483,6 +488,7 @@ export default function TurnoAdminPanel({ addToast, currentUser }) {
                     onClose={() => setCancelarModal(null)}
                 />
             )}
+            </div>
 
             <style>{`
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -516,17 +522,35 @@ function TurnoCard({ turno, config, elapsed, onLlamar, onIniciar, onFinalizar, o
     const waitColor = waitMins > 10 ? '#EF4444' : waitMins > 5 ? '#F59E0B' : '#16A34A';
 
     return (
-        <div style={{
-            background: 'rgba(255,255,255,0.9)',
-            backdropFilter: 'blur(12px)',
-            borderRadius: '16px',
-            border: isActive ? `2px solid ${estadoCfg.color}40` : '1px solid rgba(226,232,240,0.6)',
-            padding: '16px',
-            boxShadow: isActive ? `0 4px 20px ${estadoCfg.color}15` : '0 2px 10px rgba(0,0,0,0.04)',
-            transition: 'all 0.25s',
-            animation: 'fadeIn 0.3s ease-out',
-            ...(turno.estado === 'llamando' ? { animation: 'fadeIn 0.3s ease-out, pulseBorder 2s ease-in-out infinite' } : {}),
-        }}>
+        <div
+            style={{
+                background: isActive ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.65)',
+                backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                borderRadius: '20px',
+                border: isActive ? `2px solid ${estadoCfg.color}60` : '1px solid rgba(255,255,255,0.8)',
+                padding: '20px',
+                boxShadow: isActive ? `0 10px 30px ${estadoCfg.color}25, inset 0 1px 0 rgba(255,255,255,1)` : '0 10px 30px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,1)',
+                transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                animation: 'fadeIn 0.3s ease-out',
+                position: 'relative',
+                transform: 'translateY(0)',
+                ...(turno.estado === 'llamando' ? { animation: 'fadeIn 0.3s ease-out, pulseBorder 2s ease-in-out infinite' } : {}),
+            }}
+            onMouseOver={e => { 
+                if(!isActive) {
+                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.01)'; 
+                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,1)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.85)';
+                }
+            }}
+            onMouseOut={e => { 
+                if(!isActive) {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)'; 
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,1)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.65)';
+                }
+            }}
+        >
             {/* Top: Number + Badge */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -593,8 +617,8 @@ function TurnoCard({ turno, config, elapsed, onLlamar, onIniciar, onFinalizar, o
                 </div>
                 <div style={{
                     ...s.infoCell,
-                    background: waitColor + '08',
-                    border: `1px solid ${waitColor}20`,
+                    background: isActive ? waitColor + '15' : waitColor + '10',
+                    border: isActive ? `1px solid ${waitColor}40` : `1px solid ${waitColor}25`,
                 }}>
                     <span style={s.infoCellLabel}>
                         {turno.estado === 'esperando' ? '⏱ Esperando' : '⏱ Esperó'}
@@ -662,7 +686,7 @@ function CancelarModal({ turno, onConfirm, onClose }) {
 
     return (
         <div style={s.modalOverlay} onClick={onClose}>
-            <div style={{ ...s.modal, maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ ...s.modal, maxWidth: '440px', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.8)', boxShadow: '0 20px 60px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,1)' }} onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
                     <div style={{
@@ -794,13 +818,13 @@ const s = {
     header: {
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
         flexWrap: 'wrap', gap: '16px',
-        marginBottom: '20px',
-        padding: '20px 24px',
-        background: 'rgba(255,255,255,0.8)',
-        backdropFilter: 'blur(12px)',
-        borderRadius: '18px',
-        border: '1px solid rgba(226,232,240,0.5)',
-        boxShadow: '0 2px 16px rgba(0,0,0,0.04)',
+        marginBottom: '24px',
+        padding: '24px 32px',
+        background: 'rgba(255, 255, 255, 0.65)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: '24px',
+        border: '1px solid rgba(255,255,255,0.8)',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,1)',
     },
     headerLeft: { display: 'flex', alignItems: 'center', gap: '14px' },
     headerIcon: {
@@ -837,9 +861,10 @@ const s = {
     filterGroup: { display: 'flex', alignItems: 'center', gap: '8px' },
     filterLabel: { fontSize: '0.78rem', fontWeight: 700, color: '#64748B' },
     filterBtns: {
-        display: 'flex', gap: '4px',
-        background: 'rgba(241, 245, 249, 0.8)', borderRadius: '10px', padding: '3px',
-        border: '1px solid rgba(226,232,240,0.5)',
+        display: 'flex', gap: '6px',
+        background: 'rgba(255, 255, 255, 0.5)', borderRadius: '14px', padding: '6px',
+        border: '1px solid rgba(255,255,255,0.8)',
+        backdropFilter: 'blur(10px)',
     },
     filterBtn: {
         padding: '6px 12px', borderRadius: '8px',
@@ -854,11 +879,13 @@ const s = {
     },
 
     // Sections
-    queueContainer: { display: 'flex', flexDirection: 'column', gap: '20px' },
+    queueContainer: { display: 'flex', flexDirection: 'column', gap: '24px' },
     section: {
-        background: 'rgba(248, 250, 252, 0.5)',
-        borderRadius: '18px', padding: '16px',
-        border: '1px solid rgba(226,232,240,0.4)',
+        background: 'rgba(255, 255, 255, 0.45)',
+        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+        borderRadius: '24px', padding: '24px',
+        border: '1px solid rgba(255,255,255,0.7)',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
     },
     sectionHeader: {
         display: 'flex', alignItems: 'center', gap: '8px',
@@ -882,7 +909,8 @@ const s = {
 
     // Card inner
     infoCell: {
-        padding: '6px 8px', borderRadius: '8px', background: 'rgba(241,245,249,0.6)',
+        padding: '8px 12px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.7)',
+        border: '1px solid rgba(255,255,255,0.6)',
     },
     infoCellLabel: {
         display: 'block', fontSize: '0.6rem', fontWeight: 600, color: '#94A3B8',
@@ -901,12 +929,12 @@ const s = {
 
     // Métricas
     metricasPanel: {
-        background: 'rgba(255,255,255,0.85)',
-        backdropFilter: 'blur(12px)',
-        borderRadius: '18px', padding: '20px',
-        border: '1px solid rgba(226,232,240,0.5)',
-        marginBottom: '16px',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+        background: 'rgba(255, 255, 255, 0.7)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: '24px', padding: '24px',
+        border: '1px solid rgba(255,255,255,0.8)',
+        marginBottom: '20px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,1)',
         animation: 'fadeIn 0.3s ease-out',
     },
     metricasTitle: {
@@ -935,12 +963,12 @@ const s = {
 
     // Atendidos
     atendidosPanel: {
-        background: 'rgba(255,255,255,0.85)',
-        backdropFilter: 'blur(12px)',
-        borderRadius: '18px', padding: '20px',
-        border: '1px solid rgba(226,232,240,0.5)',
-        marginTop: '16px',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+        background: 'rgba(255, 255, 255, 0.7)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: '24px', padding: '24px',
+        border: '1px solid rgba(255,255,255,0.8)',
+        marginTop: '20px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,1)',
         animation: 'fadeIn 0.3s ease-out',
     },
     atendidosTable: {},
