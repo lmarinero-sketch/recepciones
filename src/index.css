@@ -658,7 +658,14 @@ a {
     z-index: 100;
     transition: width var(--transition-normal);
     box-shadow: var(--shadow-sm);
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.sidebar__nav {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 20px;
 }
 
 /* Animated gradient overlay — subtle living background */

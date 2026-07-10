@@ -268,6 +268,41 @@ export async function registrarNovedad({ periodo, tipo, medicoId, sedeId, descri
     return data;
 }
 
+export async function updateNovedad(id, { descripcion, observacion, usuario }) {
+    // First, get the current record to update the detalle JSON safely
+    const { data: current, error: fetchErr } = await supabase
+        .from('alq_novedades_log')
+        .select('detalle')
+        .eq('id', id)
+        .single();
+    if (fetchErr) throw new Error(fetchErr.message);
+
+    const newDetalle = { ...(current.detalle || {}) };
+    if (observacion) {
+        newDetalle.observacion = observacion;
+    } else {
+        delete newDetalle.observacion;
+    }
+
+    const { data, error } = await supabase
+        .from('alq_novedades_log')
+        .update({ descripcion, detalle: newDetalle, usuario })
+        .eq('id', id)
+        .select()
+        .single();
+    if (error) throw new Error(error.message);
+    return data;
+}
+
+export async function deleteNovedad(id) {
+    const { error } = await supabase
+        .from('alq_novedades_log')
+        .delete()
+        .eq('id', id);
+    if (error) throw new Error(error.message);
+    return true;
+}
+
 // =============================================
 // MÉTRICAS (via RPC)
 // =============================================
@@ -413,13 +448,28 @@ export function generarTextoMail(novedades, sedes, periodo) {
         const bajas = novedadesSede.filter(n => n.tipo === 'baja');
         const cambios = novedadesSede.filter(n => ['cambio_horario', 'cambio_sede', 'cambio_consultorio'].includes(n.tipo));
 
+        const manuales = novedadesSede.filter(n => n.tipo === 'manual');
+
         if (altas.length > 0) {
             texto += `\nAltas / Incorporaciones\n`;
-            for (const a of altas) texto += `•\t${a.descripcion}\n`;
+            for (const a of altas) {
+                texto += `•\t${a.descripcion}\n`;
+                if (a.detalle?.observacion) texto += `\tNota: ${a.detalle.observacion}\n`;
+            }
         }
         if (bajas.length > 0 || cambios.length > 0) {
             texto += `\nBajas / Cambios\n`;
-            for (const b of [...bajas, ...cambios]) texto += `•\t${b.descripcion}\n`;
+            for (const b of [...bajas, ...cambios]) {
+                texto += `•\t${b.descripcion}\n`;
+                if (b.detalle?.observacion) texto += `\tNota: ${b.detalle.observacion}\n`;
+            }
+        }
+        if (manuales.length > 0) {
+            texto += `\nOtras Novedades / Observaciones\n`;
+            for (const m of manuales) {
+                texto += `•\t${m.descripcion}\n`;
+                if (m.detalle?.observacion) texto += `\tNota: ${m.detalle.observacion}\n`;
+            }
         }
         texto += `${'─'.repeat(40)}\n`;
     }

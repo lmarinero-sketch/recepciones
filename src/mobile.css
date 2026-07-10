@@ -30,15 +30,15 @@
     box-shadow: none;
   }
 
-  .sidebar.sidebar--mobile-open {
-    transform: translateX(0);
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
-  }
-
   /* When on mobile, don't use the collapsed width if it's meant to be hidden */
   .sidebar.sidebar--collapsed {
     transform: translateX(-100%);
     width: var(--sidebar-width);
+  }
+
+  .sidebar.sidebar--mobile-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
   }
 
   .sidebar-mobile-overlay {
