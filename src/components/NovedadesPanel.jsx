@@ -46,6 +46,7 @@ export default function NovedadesPanel({ addToast }) {
     const [isCreating, setIsCreating] = useState(false);
     const [formData, setFormData] = useState({ descripcion: '', observacion: '', sede_id: '' });
     const [isSaving, setIsSaving] = useState(false);
+    const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -91,11 +92,12 @@ export default function NovedadesPanel({ addToast }) {
         return counts;
     }, [novedades]);
 
-    const handleDelete = async (id) => {
-        if (!confirm('¿Estás seguro de eliminar esta novedad?')) return;
+    const handleDelete = async () => {
+        if (!deleteConfirmId) return;
         try {
-            await deleteNovedad(id);
+            await deleteNovedad(deleteConfirmId);
             addToast?.('Novedad eliminada', 'success');
+            setDeleteConfirmId(null);
             loadData();
         } catch (err) {
             addToast?.('Error eliminando: ' + err.message, 'error');
@@ -293,7 +295,7 @@ export default function NovedadesPanel({ addToast }) {
                                         }} style={actionBtn} title="Editar">
                                             <Edit2 size={13} />
                                         </button>
-                                        <button onClick={() => handleDelete(n.id)} style={{...actionBtn, color: 'var(--danger-500)'}} title="Eliminar">
+                                        <button onClick={() => setDeleteConfirmId(n.id)} style={{...actionBtn, color: 'var(--danger-500)'}} title="Eliminar">
                                             <Trash2 size={13} />
                                         </button>
                                     </div>
@@ -361,18 +363,34 @@ export default function NovedadesPanel({ addToast }) {
                     }}
                 >
                     <div style={{
-                        background: 'white', borderRadius: '16px',
-                        boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
-                        maxWidth: '480px', width: '100%', padding: '24px',
+                        background: 'white', borderRadius: '20px',
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                        maxWidth: '520px', width: '100%', padding: '32px',
+                        transform: 'translateY(0)', transition: 'all 0.3s ease-out'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>
-                                {isCreating ? 'Nueva Observación' : 'Editar Novedad'}
-                            </h3>
-                            <button onClick={() => { setEditItem(null); setIsCreating(false); }} style={iconBtn}><X size={18} /></button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{
+                                    width: '40px', height: '40px', borderRadius: '10px',
+                                    background: isCreating ? 'var(--neutral-100)' : 'var(--primary-50)',
+                                    color: isCreating ? 'var(--neutral-600)' : 'var(--primary-600)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                    {isCreating ? <Plus size={20} /> : <Edit2 size={20} />}
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--neutral-800)' }}>
+                                        {isCreating ? 'Nueva Observación' : 'Editar Novedad'}
+                                    </h3>
+                                    <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--neutral-500)' }}>
+                                        {isCreating ? 'Añadir un registro manual' : 'Modificar el registro automático'}
+                                    </p>
+                                </div>
+                            </div>
+                            <button onClick={() => { setEditItem(null); setIsCreating(false); }} style={{...iconBtn, background: 'transparent', border: 'none'}}><X size={20} /></button>
                         </div>
                         
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {isCreating && (
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '6px', color: 'var(--neutral-600)' }}>
@@ -414,22 +432,72 @@ export default function NovedadesPanel({ addToast }) {
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end', paddingTop: '20px', borderTop: '1px solid var(--neutral-100)' }}>
                             <button onClick={() => { setEditItem(null); setIsCreating(false); }} style={{
-                                padding: '8px 16px', borderRadius: '8px', background: 'white',
+                                padding: '10px 20px', borderRadius: '10px', background: 'white',
                                 color: 'var(--neutral-600)', border: '1px solid var(--neutral-200)',
-                                fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer',
-                            }}>
+                                fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s',
+                            }} onMouseOver={e => e.currentTarget.style.background = 'var(--neutral-50)'} onMouseOut={e => e.currentTarget.style.background = 'white'}>
                                 Cancelar
                             </button>
                             <button onClick={isCreating ? handleSaveCreate : handleSaveEdit} disabled={isSaving} style={{
-                                padding: '8px 16px', borderRadius: '8px', background: 'var(--primary-500)',
-                                color: 'white', border: 'none', fontWeight: 600, fontSize: '0.82rem',
-                                cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-                                opacity: isSaving ? 0.7 : 1
+                                padding: '10px 24px', borderRadius: '10px', background: 'var(--primary-500)',
+                                color: 'white', border: 'none', fontWeight: 600, fontSize: '0.85rem',
+                                cursor: isSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+                                opacity: isSaving ? 0.7 : 1, boxShadow: '0 4px 6px -1px rgba(14, 165, 233, 0.2)', transition: 'all 0.2s'
+                            }} onMouseOver={e => { if(!isSaving) e.currentTarget.style.transform = 'translateY(-1px)'; }} onMouseOut={e => { if(!isSaving) e.currentTarget.style.transform = 'none'; }}>
+                                {isSaving ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
+                                Guardar Cambios
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirm Modal */}
+            {deleteConfirmId && (
+                <div onClick={e => { if (e.target === e.currentTarget) setDeleteConfirmId(null); }}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 110,
+                        background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                    }}
+                >
+                    <div style={{
+                        background: 'white', borderRadius: '16px',
+                        boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
+                        maxWidth: '400px', width: '100%', padding: '24px',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{
+                            width: '48px', height: '48px', borderRadius: '50%',
+                            background: 'var(--danger-50)', color: 'var(--danger-500)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            margin: '0 auto 16px'
+                        }}>
+                            <Trash2 size={24} />
+                        </div>
+                        <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', fontWeight: 700, color: 'var(--neutral-800)' }}>
+                            Eliminar Novedad
+                        </h3>
+                        <p style={{ margin: '0 0 24px 0', fontSize: '0.9rem', color: 'var(--neutral-500)', lineHeight: 1.5 }}>
+                            ¿Estás seguro que querés eliminar esta novedad? Esta acción borrará el registro del historial para este mes.
+                        </p>
+                        
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                            <button onClick={() => setDeleteConfirmId(null)} style={{
+                                padding: '10px 20px', borderRadius: '8px', background: 'white',
+                                color: 'var(--neutral-700)', border: '1px solid var(--neutral-200)',
+                                fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer', flex: 1
                             }}>
-                                {isSaving && <Loader2 size={14} className="spin" />}
-                                Guardar
+                                Cancelar
+                            </button>
+                            <button onClick={handleDelete} style={{
+                                padding: '10px 20px', borderRadius: '8px', background: 'var(--danger-500)',
+                                color: 'white', border: 'none', fontWeight: 600, fontSize: '0.9rem',
+                                cursor: 'pointer', flex: 1
+                            }}>
+                                Sí, eliminar
                             </button>
                         </div>
                     </div>
@@ -455,7 +523,9 @@ const actionBtn = {
 };
 
 const inputStyle = {
-    width: '100%', padding: '10px 12px', borderRadius: '8px',
-    border: '1px solid var(--neutral-200)', fontSize: '0.82rem',
-    fontFamily: 'inherit', outline: 'none'
+    width: '100%', padding: '12px 16px', borderRadius: '10px',
+    border: '1px solid var(--neutral-200)', fontSize: '0.85rem',
+    fontFamily: 'inherit', outline: 'none', background: 'var(--neutral-50)',
+    color: 'var(--neutral-800)', transition: 'all 0.2s',
+    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
 };
