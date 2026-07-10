@@ -6,7 +6,7 @@ import ChangePasswordModal from './components/ChangePasswordModal.jsx';
 import { getCurrentUser, logout as authLogout } from './services/authService';
 import { logAction } from './services/auditService';
 import { subscribeToAllIncoming, fetchUnreadCounts } from './services/chatService';
-import { LogOut, KeyRound } from 'lucide-react';
+import { LogOut, KeyRound, Menu } from 'lucide-react';
 import MessagingPanel from './components/MessagingPanel.jsx';
 import TemplateManager from './components/TemplateManager.jsx';
 import WhatsAppLineStatus from './components/WhatsAppLineStatus.jsx';
@@ -49,11 +49,13 @@ function AppRoot() {
 
 function App({ currentUser, onLogout }) {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebar_collapsed') === 'true');
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [activeView, setActiveViewRaw] = useState(() => localStorage.getItem('active_view') || 'inicio');
 
     const setActiveView = useCallback((view) => {
         setActiveViewRaw(view);
         localStorage.setItem('active_view', view);
+        setMobileSidebarOpen(false);
     }, []);
 
     const [showChangePassword, setShowChangePassword] = useState(false);
@@ -132,9 +134,15 @@ function App({ currentUser, onLogout }) {
 
     return (
         <div className="app">
+            <div 
+                className={`sidebar-mobile-overlay ${mobileSidebarOpen ? 'active' : ''}`} 
+                onClick={() => setMobileSidebarOpen(false)} 
+            />
             <Sidebar
                 collapsed={sidebarCollapsed}
                 onToggle={() => setSidebarCollapsed(prev => { const next = !prev; localStorage.setItem('sidebar_collapsed', next); return next; })}
+                mobileOpen={mobileSidebarOpen}
+                onCloseMobile={() => setMobileSidebarOpen(false)}
                 activeView={activeView}
                 onViewChange={setActiveView}
                 unreadMessageCount={globalUnreadCount}
@@ -153,6 +161,9 @@ function App({ currentUser, onLogout }) {
                         />
                     </div>
                     <div className="topbar__left">
+                        <button className="mobile-menu-btn" onClick={() => setMobileSidebarOpen(true)}>
+                            <Menu size={20} />
+                        </button>
                         <h1 className="topbar__title topbar__title--wave">
                             {'Recepciones'.split('').map((char, i) => (
                                 <span key={`r-${i}`} className="topbar__wave-letter topbar__title-accent" style={{ animationDelay: `${i * 0.08}s` }}>{char === ' ' ? '\u00A0' : char}</span>

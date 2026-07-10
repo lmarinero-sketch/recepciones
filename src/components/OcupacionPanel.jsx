@@ -9,12 +9,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Building2, Calendar, ChevronLeft, ChevronRight, UserPlus, UserMinus,
     ArrowRightLeft, X, Search, Check, AlertCircle, BarChart3, RefreshCw,
-    User, Stethoscope, Hash, Loader2, Plus, Trash2, GripVertical,
+    User, Stethoscope, Hash, Loader2, Plus, Trash2, GripVertical, Copy,
 } from 'lucide-react';
 import {
     fetchSedes, fetchConsultorios, fetchAsignaciones,
     fetchMedicos, asignarMedico, desasignarMedico, moverMedico,
-    createMedico,
+    createMedico, copiarMesAnterior,
     buildGrilla, calcularMetricasLocal, getPeriodoActual,
     DIAS, FRANJAS, DIAS_LABELS, FRANJAS_LABELS,
 } from '../services/alquileresService';
@@ -58,6 +58,7 @@ export default function OcupacionPanel({ addToast }) {
     const [medicos, setMedicos] = useState([]);
     const [medicoSearch, setMedicoSearch] = useState('');
     const [saving, setSaving] = useState(false);
+    const [copying, setCopying] = useState(false);
 
     // New medico inline
     const [showNewMedico, setShowNewMedico] = useState(false);
@@ -110,9 +111,18 @@ export default function OcupacionPanel({ addToast }) {
     }, [modal?.type]);
 
     const filteredMedicos = useMemo(() => {
-        if (!medicoSearch) return medicos;
+        // Deduplicar médicos por nombre_display para evitar repetidos
+        const uniqueMedicosMap = new Map();
+        for (const m of medicos) {
+            if (!uniqueMedicosMap.has(m.nombre_display)) {
+                uniqueMedicosMap.set(m.nombre_display, m);
+            }
+        }
+        const uniqueMedicos = Array.from(uniqueMedicosMap.values());
+
+        if (!medicoSearch) return uniqueMedicos;
         const s = medicoSearch.toLowerCase();
-        return medicos.filter(m => 
+        return uniqueMedicos.filter(m => 
             m.nombre_display?.toLowerCase().includes(s) || 
             m.matricula?.includes(s) ||
             m.especialidad?.toLowerCase().includes(s)
@@ -190,6 +200,24 @@ export default function OcupacionPanel({ addToast }) {
         }
     };
 
+    const handleCopiarMesAnterior = async () => {
+        if (!selectedSede || copying) return;
+        setCopying(true);
+        try {
+            const numCopiados = await copiarMesAnterior(selectedSede.id, periodo);
+            if (numCopiados > 0) {
+                addToast?.(`Se copiaron ${numCopiados} asignaciones del mes anterior`, 'success');
+                await loadData();
+            } else {
+                addToast?.('No se encontraron nuevos espacios vacíos para rellenar o el mes anterior está vacío.', 'info');
+            }
+        } catch (err) {
+            addToast?.(err.message, 'error');
+        } finally {
+            setCopying(false);
+        }
+    };
+
     // ── Render ──
     if (loading && sedes.length === 0) {
         return (
@@ -234,6 +262,21 @@ export default function OcupacionPanel({ addToast }) {
 
                     {/* Periodo selector */}
                     <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button 
+                            onClick={handleCopiarMesAnterior} 
+                            disabled={copying}
+                            title="Copiar vacíos del mes pasado"
+                            style={{ 
+                                display: 'flex', alignItems: 'center', gap: '6px', 
+                                padding: '4px 10px', borderRadius: '8px', 
+                                border: '1px solid var(--primary-200)', 
+                                background: 'var(--primary-50)', color: 'var(--primary-700)',
+                                fontSize: '0.78rem', fontWeight: 600, cursor: copying ? 'not-allowed' : 'pointer' 
+                            }}>
+                            {copying ? <Loader2 size={14} className="spin" /> : <Copy size={14} />}
+                            <span className="no-mobile">Copiar Mes Anterior</span>
+                        </button>
+
                         <button onClick={() => setPeriodo(p => shiftPeriodo(p, -1))} style={{ ...iconBtnStyle }}>
                             <ChevronLeft size={16} />
                         </button>

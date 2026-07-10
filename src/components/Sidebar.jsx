@@ -3,10 +3,10 @@ import {
     Settings, PanelLeftClose, PanelLeft,
     ChevronDown, Home, MessageSquareText, MessageCircle,
     Brain, HeartPulse, RefreshCw, BarChart3, Bell, ClipboardCheck,
-    Building2, FileText, DollarSign, LayoutDashboard, UserPlus, FolderClock, Megaphone,
+    Building2, FileText, DollarSign, LayoutDashboard, UserPlus, FolderClock, Megaphone, X,
 } from 'lucide-react';
 
-export default function Sidebar({ collapsed, onToggle, activeView, onViewChange, unreadMessageCount = 0 }) {
+export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile, activeView, onViewChange, unreadMessageCount = 0 }) {
     const [mensajeriaOpen, setMensajeriaOpen] = useState(false);
     const [preventivaOpen, setPreventivaOpen] = useState(false);
     const [alquileresOpen, setAlquileresOpen] = useState(false);
@@ -144,7 +144,7 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
     }
 
     return (
-        <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
+        <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''} ${mobileOpen ? 'sidebar--mobile-open' : ''}`}>
             {/* Animated video background */}
             <div className="sidebar__video-bg">
                 <video
@@ -179,6 +179,13 @@ export default function Sidebar({ collapsed, onToggle, activeView, onViewChange,
                     aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
                 >
                     {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+                </button>
+                <button
+                    className="sidebar-mobile-close"
+                    onClick={onCloseMobile}
+                    aria-label="Cerrar menú"
+                >
+                    <X size={20} />
                 </button>
             </div>
 

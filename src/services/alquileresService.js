@@ -172,6 +172,76 @@ export async function moverMedico(asignacionId, { nuevoConsultorioId, nuevoDia, 
     });
 }
 
+/**
+ * Copia las asignaciones del mes anterior al mes destino.
+ * Solo copia en slots que actualmente estén vacíos en el mes destino.
+ */
+export async function copiarMesAnterior(sedeId, periodoDestino) {
+    // Calcular periodo anterior
+    const [yearStr, monthStr] = periodoDestino.split('-');
+    let y = parseInt(yearStr);
+    let m = parseInt(monthStr);
+    if (m === 1) {
+        y -= 1;
+        m = 12;
+    } else {
+        m -= 1;
+    }
+    const periodoAnterior = `${y}-${String(m).padStart(2, '0')}`;
+
+    // Buscar asignaciones del mes anterior para esta sede
+    const asignacionesAnteriores = await fetchAsignaciones(periodoAnterior, sedeId);
+    if (asignacionesAnteriores.length === 0) {
+        throw new Error('No hay datos en el mes anterior para copiar.');
+    }
+
+    // Buscar asignaciones actuales para no pisarlas
+    const asignacionesActuales = await fetchAsignaciones(periodoDestino, sedeId);
+    
+    // Crear mapa de ocupación actual: consultorio_id -> dia -> franja -> true
+    const ocupacionActual = {};
+    for (const a of asignacionesActuales) {
+        if (!a.consultorio_id) continue;
+        if (!ocupacionActual[a.consultorio_id]) ocupacionActual[a.consultorio_id] = {};
+        if (!ocupacionActual[a.consultorio_id][a.dia_semana]) ocupacionActual[a.consultorio_id][a.dia_semana] = {};
+        ocupacionActual[a.consultorio_id][a.dia_semana][a.franja] = true;
+    }
+
+    // Filtrar las asignaciones anteriores que podemos insertar (slots libres)
+    const asignacionesAInsertar = [];
+    for (const a of asignacionesAnteriores) {
+        if (!a.consultorio_id) continue;
+        // Si ya está ocupado en el mes actual, no lo copiamos
+        if (ocupacionActual[a.consultorio_id]?.[a.dia_semana]?.[a.franja]) continue;
+        
+        asignacionesAInsertar.push({
+            medico_id: a.medico_id,
+            consultorio_id: a.consultorio_id,
+            dia_semana: a.dia_semana,
+            franja: a.franja,
+            periodo: periodoDestino,
+            es_residente: a.es_residente || false,
+            es_rotativo: a.es_rotativo || false,
+        });
+    }
+
+    if (asignacionesAInsertar.length === 0) {
+        return 0; // Nada nuevo que copiar
+    }
+
+    // Insertar en bloque
+    const { error } = await supabase
+        .from('alq_asignaciones')
+        .insert(asignacionesAInsertar);
+        
+    if (error) {
+        console.error('Error copiando asignaciones:', error);
+        throw new Error('No se pudieron copiar las asignaciones');
+    }
+
+    return asignacionesAInsertar.length;
+}
+
 // =============================================
 // NOVEDADES
 // =============================================
