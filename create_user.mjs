@@ -3,59 +3,77 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {
-  const email = 'rmarun@sanatorioargentino.com.ar';
-  const password = '123456';
+    const usuario = 'rmarun'; // Normalized username
+    const nombre = 'Roberto Marun'; // You can use anything or fetch if exists
+    const password = '123456';
+    const iniciales = 'RM';
 
-  console.log(`Intentando crear el usuario: ${email}...`);
+    console.log(`Buscando usuario: ${usuario}...`);
 
-  const { data, error } = await supabase.auth.admin.createUser({
-    email: email,
-    password: password,
-    email_confirm: true 
-  });
-
-  if (error) {
-    if (error.message.includes('already exists') || error.message.includes('email address')) {
-      console.log('El usuario ya existe en auth. Actualizando contraseña...');
-      
-      const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
-      if (listError) {
-        console.error('Error listing users:', listError.message);
+    const { data: users, error } = await supabase
+        .from('admqui_usuarios')
+        .select('*')
+        .eq('usuario', usuario);
+        
+    if (error) {
+        console.error('Error fetching user:', error.message);
         return;
-      }
-      
-      const user = users.find(u => u.email === email);
-      if (user) {
-         const { data: updateData, error: updateError } = await supabase.auth.admin.updateUserById(
-           user.id,
-           { password: password, email_confirm: true }
-         );
-         
-         if (updateError) {
-           console.error('Error actualizando usuario:', updateError.message);
-         } else {
-           console.log('✅ Contraseña actualizada correctamente para el usuario existente.');
-         }
-      } else {
-         console.error('El usuario no se encontró en la lista, aunque dio error de duplicado.');
-      }
-    } else {
-      console.error('❌ Error creando usuario:', error.message);
     }
-  } else {
-    console.log('✅ ¡Usuario creado con éxito en auth!');
-  }
-  
-  // Update public user profile just in case there is one
-  console.log('Verificando en base de datos publica...');
+
+    if (users && users.length === 0) {
+        console.log(`Usuario no encontrado. Creando ${usuario}...`);
+        const { data, error: createError } = await supabase.rpc('create_user', {
+            p_usuario: usuario,
+            p_nombre: nombre,
+            p_password: password,
+            p_iniciales: iniciales,
+        });
+        
+        if (createError) {
+            console.error('Error creating user:', createError.message);
+        } else {
+            console.log('✅ Usuario creado correctamente.');
+        }
+    } else {
+        console.log(`Usuario ya existe. Intentando borrar y recrear para resetear password...`);
+        const { error: deleteError } = await supabase
+            .from('admqui_usuarios')
+            .delete()
+            .eq('usuario', usuario);
+            
+        if (deleteError) {
+             console.error('Error borrando usuario:', deleteError.message);
+             // Si falla borrar por foreign keys, intentaremos update si hay un rpc de reset
+             console.log('Intentando actualizar password con change_password_admin...');
+             const { error: resetError } = await supabase.rpc('change_password_admin', {
+                 p_user_id: users[0].id,
+                 p_new_password: password,
+             });
+             if (resetError) {
+                  console.error('Error updating password via admin rpc:', resetError.message);
+             } else {
+                  console.log('✅ Contraseña actualizada vía admin RPC');
+             }
+             return;
+        }
+        
+        console.log('Usuario borrado. Re-creando...');
+        const { data, error: createError } = await supabase.rpc('create_user', {
+            p_usuario: usuario,
+            p_nombre: users[0].nombre || nombre,
+            p_password: password,
+            p_iniciales: users[0].iniciales || iniciales,
+        });
+        
+        if (createError) {
+            console.error('Error re-creating user:', createError.message);
+        } else {
+            console.log('✅ Usuario re-creado correctamente (contraseña reseteada).');
+        }
+    }
 }
 
-run();
+run().catch(console.error);
