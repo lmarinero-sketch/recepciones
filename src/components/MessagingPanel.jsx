@@ -895,7 +895,25 @@ export default function MessagingPanel({ addToast }) {
     // RENDER MESSAGE CONTENT (images, audio, video, docs, text)
     // ==========================================
     const renderMessageContent = (msg) => {
-        switch (msg.media_type) {
+        let effectiveMediaType = msg.media_type;
+        let effectiveContent = msg.content;
+
+        // Fallback for older messages that saved the builderbot event string
+        if (typeof effectiveContent === 'string' && effectiveContent.startsWith('_event_')) {
+            if (effectiveContent.includes('_voice_note_') || effectiveContent.includes('_audio_')) {
+                effectiveMediaType = 'audio';
+            } else if (effectiveContent.includes('_image_')) {
+                effectiveMediaType = 'image';
+            } else if (effectiveContent.includes('_video_')) {
+                effectiveMediaType = 'video';
+            } else if (effectiveContent.includes('_document_') || effectiveContent.includes('_media_')) {
+                effectiveMediaType = 'document';
+            }
+            // Clear the ugly event string so it doesn't render
+            effectiveContent = '';
+        }
+
+        switch (effectiveMediaType) {
             case 'image':
             case 'sticker':
                 return (
@@ -907,8 +925,8 @@ export default function MessagingPanel({ addToast }) {
                             onClick={() => setLightboxUrl(msg.media_url)}
                             onError={(e) => { e.target.style.display = 'none'; }}
                         />
-                        {msg.content && msg.content !== '[image]' && msg.content !== '[sticker]' && msg.content !== '📷 Imagen' && (
-                            <p className="msg-panel__bubble-text">{msg.content}</p>
+                        {effectiveContent && effectiveContent !== '[image]' && effectiveContent !== '[sticker]' && effectiveContent !== '📷 Imagen' && (
+                            <p className="msg-panel__bubble-text">{effectiveContent}</p>
                         )}
                     </div>
                 );
@@ -932,14 +950,14 @@ export default function MessagingPanel({ addToast }) {
                 return (
                     <div>
                         <video src={msg.media_url} controls style={{ maxWidth: '280px', borderRadius: '8px', display: 'block' }} />
-                        {msg.content && msg.content !== '[video]' && <p className="msg-panel__bubble-text">{msg.content}</p>}
+                        {effectiveContent && effectiveContent !== '[video]' && <p className="msg-panel__bubble-text">{effectiveContent}</p>}
                     </div>
                 );
             case 'document':
                 return (
                     <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="msg-panel__doc-link">
                         <Download size={16} />
-                        <span>{msg.content || 'Documento adjunto'}</span>
+                        <span>{effectiveContent || 'Documento adjunto'}</span>
                     </a>
                 );
             default: {
@@ -947,10 +965,10 @@ export default function MessagingPanel({ addToast }) {
                 const buttons = msg.raw_payload?.templateButtons;
                 if (buttons && buttons.length > 0) {
                     // Extraer el texto limpio (sin el prefijo 📋 [Plantilla Meta] name:)
-                    const cleanContent = (msg.content || '').replace(/^📋\s*\[Plantilla Meta\]\s*\S+:\s*/, '');
+                    const cleanContent = (effectiveContent || '').replace(/^📋\s*\[Plantilla Meta\]\s*\S+:\s*/, '');
                     return (
                         <div className="msg-panel__template-msg">
-                            <p className="msg-panel__bubble-text">{cleanContent || msg.content}</p>
+                            <p className="msg-panel__bubble-text">{cleanContent || effectiveContent}</p>
                             <div className="msg-panel__template-buttons">
                                 {buttons.map((btn, i) => (
                                     <span key={i} className="msg-panel__template-btn">{btn}</span>
@@ -959,7 +977,7 @@ export default function MessagingPanel({ addToast }) {
                         </div>
                     );
                 }
-                return <p className="msg-panel__bubble-text">{msg.content}</p>;
+                return <p className="msg-panel__bubble-text">{effectiveContent}</p>;
             }
         }
     };

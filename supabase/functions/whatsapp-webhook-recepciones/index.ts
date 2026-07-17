@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
             }
         }
 
-        // 2. Detectar tipo desde data.message (Baileys/WAWebJS message keys)
+        // 2. Detectar tipo desde data.message (Baileys/WAWebJS message keys) o data.type
         if (data.message) {
             const msg = data.message;
             if (msg.imageMessage) mediaType = 'image';
@@ -134,6 +134,18 @@ Deno.serve(async (req) => {
             else if (msg.videoMessage) mediaType = 'video';
             else if (msg.stickerMessage) mediaType = 'sticker';
             else if (msg.documentMessage || msg.documentWithCaptionMessage) mediaType = 'document';
+        } else if (data.type) {
+            if (data.type === 'audio' || data.type === 'voice') mediaType = 'audio';
+            else if (data.type === 'image') mediaType = 'image';
+            else if (data.type === 'video') mediaType = 'video';
+            else if (data.type === 'document' || data.type === 'file') mediaType = 'document';
+            else if (data.type === 'sticker') mediaType = 'sticker';
+        } else if (data.fileData?.mime_type) {
+            const mime = data.fileData.mime_type.toLowerCase();
+            if (mime.startsWith('image/')) mediaType = 'image';
+            else if (mime.startsWith('audio/')) mediaType = 'audio';
+            else if (mime.startsWith('video/')) mediaType = 'video';
+            else if (mime.startsWith('application/')) mediaType = 'document';
         }
 
         // 3. Si no tenemos URL aún, buscar en data.media
@@ -175,9 +187,9 @@ Deno.serve(async (req) => {
             mediaType = inferMediaType(mediaUrl, data.attachment?.[0]);
         }
 
-        // Limpiar contenido: si es un _event_media__ y tenemos mediaUrl, usar caption o tipo
+        // Limpiar contenido: si es un evento de builderbot no queremos guardar el string crudo
         let content = rawContent;
-        if (content && content.startsWith('_event_media__')) {
+        if (content && typeof content === 'string' && content.startsWith('_event_')) {
             // El body es solo el ID del media, no texto real
             content = data.caption || data.message?.imageMessage?.caption ||
                 data.message?.videoMessage?.caption || '';
@@ -500,7 +512,7 @@ function inferMediaType(url, attachment) {
 
     // Por extensión
     if (/\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(lower)) return 'image';
-    if (/\.(mp3|ogg|opus|wav|m4a|aac|weba|webm)(\?|$)/i.test(lower) && !lower.includes('video')) return 'audio';
+    if (/\.(mp3|ogg|oga|opus|wav|m4a|aac|weba|webm)(\?|$)/i.test(lower) && !lower.includes('video')) return 'audio';
     if (/\.(mp4|mov|avi|mkv|3gp)(\?|$)/i.test(lower)) return 'video';
     if (/\.(pdf|doc|docx|xls|xlsx|csv|txt|ppt|pptx)(\?|$)/i.test(lower)) return 'document';
 

@@ -755,7 +755,25 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
     });
 
     const renderMessageContent = (msg) => {
-        switch (msg.media_type) {
+        let effectiveMediaType = msg.media_type;
+        let effectiveContent = msg.content;
+
+        // Fallback for older messages that saved the builderbot event string
+        if (typeof effectiveContent === 'string' && effectiveContent.startsWith('_event_')) {
+            if (effectiveContent.includes('_voice_note_') || effectiveContent.includes('_audio_')) {
+                effectiveMediaType = 'audio';
+            } else if (effectiveContent.includes('_image_')) {
+                effectiveMediaType = 'image';
+            } else if (effectiveContent.includes('_video_')) {
+                effectiveMediaType = 'video';
+            } else if (effectiveContent.includes('_document_') || effectiveContent.includes('_media_')) {
+                effectiveMediaType = 'document';
+            }
+            // Clear the ugly event string so it doesn't render
+            effectiveContent = '';
+        }
+
+        switch (effectiveMediaType) {
             case 'image':
             case 'sticker':
                 return (
@@ -771,8 +789,8 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                             }}
                             onError={(e) => { e.target.style.display = 'none'; }}
                         />
-                        {msg.content && msg.content !== '[image]' && msg.content !== '[sticker]' && msg.content !== '📷 Imagen' && (
-                            <p style={{ margin: '6px 0 0', fontSize: '0.85rem' }}>{msg.content}</p>
+                        {effectiveContent && effectiveContent !== '[image]' && effectiveContent !== '[sticker]' && effectiveContent !== '📷 Imagen' && (
+                            <p style={{ margin: '6px 0 0', fontSize: '0.85rem' }}>{effectiveContent}</p>
                         )}
                     </div>
                 );
@@ -820,8 +838,8 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                             controls
                             style={{ maxWidth: '280px', borderRadius: '8px', display: 'block' }}
                         />
-                        {msg.content && msg.content !== '[video]' && (
-                            <p style={{ margin: '6px 0 0', fontSize: '0.85rem' }}>{msg.content}</p>
+                        {effectiveContent && effectiveContent !== '[video]' && (
+                            <p style={{ margin: '6px 0 0', fontSize: '0.85rem' }}>{effectiveContent}</p>
                         )}
                     </div>
                 );
@@ -838,7 +856,7 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                     >
                         <Download size={18} />
                         <span style={{ fontSize: '0.83rem', fontWeight: 500 }}>
-                            {msg.content || 'Documento adjunto'}
+                            {effectiveContent || 'Documento adjunto'}
                         </span>
                     </a>
                 );
@@ -846,10 +864,10 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                 // Detectar si es un mensaje de plantilla Meta con botones
                 const buttons = msg.raw_payload?.templateButtons;
                 if (buttons && buttons.length > 0) {
-                    const cleanContent = (msg.content || '').replace(/^📋\s*\[Plantilla Meta\]\s*\S+:\s*/, '');
+                    const cleanContent = (effectiveContent || '').replace(/^📋\s*\[Plantilla Meta\]\s*\S+:\s*/, '');
                     return (
                         <div>
-                            <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{cleanContent || msg.content}</p>
+                            <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{cleanContent || effectiveContent}</p>
                             <div style={{
                                 display: 'flex', flexWrap: 'wrap', gap: '6px',
                                 marginTop: '10px', paddingTop: '8px',
@@ -867,7 +885,7 @@ export default function ChatWindow({ open, onClose, patientName, patientPhone, p
                         </div>
                     );
                 }
-                return <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{msg.content}</p>;
+                return <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{effectiveContent}</p>;
             }
         }
     };
