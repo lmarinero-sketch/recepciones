@@ -14,6 +14,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile
     const mensajeriaSubItems = [
         { id: 'mensajeria', label: 'Chat Central', icon: MessageCircle },
         { id: 'plantillas', label: 'Plantillas', icon: MessageSquareText },
+        { id: 'metricas_mensajeria', label: 'Métricas Mensajería', icon: BarChart3 },
     ];
 
     const isMensajeriaActive = mensajeriaSubItems.some(i => activeView === i.id);

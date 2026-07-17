@@ -18,6 +18,7 @@ import RecordatoriosPanel from './components/RecordatoriosPanel.jsx';
 import MetricasRecordatoriosPanel from './components/MetricasRecordatoriosPanel.jsx';
 import EncuestaCalidadPanel from './components/EncuestaCalidadPanel.jsx';
 import MetricasEncuestasPanel from './components/MetricasEncuestasPanel.jsx';
+import MetricasMensajeriaPanel from './components/MetricasMensajeriaPanel.jsx';
 import OcupacionPanel from './components/OcupacionPanel.jsx';
 import NovedadesPanel from './components/NovedadesPanel.jsx';
 import LiquidacionPanel from './components/LiquidacionPanel.jsx';
@@ -254,10 +255,12 @@ function App({ currentUser, onLogout }) {
                     <ChequeoPanel addToast={addToast} />
                 )}
 
-
-
                 {activeView === 'recordatorios' && (
                     <RecordatoriosPanel addToast={addToast} />
+                )}
+
+                {activeView === 'metricas_mensajeria' && (
+                    <MetricasMensajeriaPanel addToast={addToast} />
                 )}
 
                 {activeView === 'metricas' && (
