@@ -288,6 +288,27 @@ export default function MetricasMensajeriaPanel({ addToast }) {
                             </div>
                         </div>
 
+                        {/* Category Cards */}
+                        {metrics.typeBreakdown.length > 0 && (
+                            <div style={{ marginBottom: '24px' }}>
+                                <h3 style={{ margin: '0 0 16px', fontSize: '1.05rem', fontWeight: 600, color: '#475569' }}>
+                                    Totales por Categoría
+                                </h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                                    {metrics.typeBreakdown.map((item, i) => (
+                                        <div key={i} style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', borderLeft: `4px solid ${COLORS[i % COLORS.length]}`, display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.name}>
+                                                {item.name}
+                                            </span>
+                                            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' }}>
+                                                {item.count.toLocaleString('es-AR')}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Chart Area */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '24px', marginBottom: '24px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
