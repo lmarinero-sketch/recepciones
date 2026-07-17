@@ -40,17 +40,35 @@ export default function MetricasMensajeriaPanel({ addToast }) {
                 toDate = new Date(`${customEndDate}T23:59:59`);
             }
 
-            const { data, error } = await supabase
-                .from('whatsapp_messages')
-                .select('id, created_at, content, raw_payload, line_id, phone')
-                .gte('created_at', fromDate.toISOString())
-                .lte('created_at', toDate.toISOString())
-                .ilike('content', '%plantilla%')
-                .order('created_at', { ascending: false })
-                .limit(100000); // Quitamos límite por defecto de 1000 de Supabase
+            let allData = [];
+            let isFetching = true;
+            let step = 1000;
+            let from = 0;
 
-            if (error) throw error;
-            setMessages(data || []);
+            while (isFetching) {
+                const { data, error } = await supabase
+                    .from('whatsapp_messages')
+                    .select('id, created_at, content, raw_payload, line_id, phone')
+                    .gte('created_at', fromDate.toISOString())
+                    .lte('created_at', toDate.toISOString())
+                    .ilike('content', '%plantilla%')
+                    .order('created_at', { ascending: false })
+                    .range(from, from + step - 1);
+
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    allData = [...allData, ...data];
+                    from += step;
+                    if (data.length < step) {
+                        isFetching = false;
+                    }
+                } else {
+                    isFetching = false;
+                }
+            }
+
+            setMessages(allData);
         } catch (e) {
             console.error(e);
             addToast?.('Error cargando métricas de mensajería', 'error');
