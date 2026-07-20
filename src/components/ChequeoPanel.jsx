@@ -218,7 +218,7 @@ export default function ChequeoPanel({ addToast }) {
             // Auto-select template para chequeos (evitar "captar_clientes" que es de quirófano)
             const defaultTpl = metaTemplates.find(t => {
                 const name = (t.name || t.templateName || '').toLowerCase();
-                return name === 'marketing' || name.includes('chequeo');
+                return name === 'recordatorio_dia_semana_san_luis' || name === 'marketing' || name.includes('chequeo');
             });
             setSelectedMetaTemplate(defaultTpl || null);
 
