@@ -578,6 +578,22 @@ export default function OcupacionPanel({ addToast }) {
 
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <button
+                                onClick={() => {
+                                    setModal({ type: 'asignar', consultorio: modal.consultorio, dia: modal.dia, franja: modal.franja });
+                                    setMedicoSearch('');
+                                }}
+                                style={{
+                                    flex: 1, padding: '10px', borderRadius: '8px',
+                                    border: '1px solid var(--primary-300)', background: 'var(--primary-50)',
+                                    color: 'var(--primary-700)', fontWeight: 600, fontSize: '0.82rem',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center',
+                                    justifyContent: 'center', gap: '6px',
+                                }}
+                            >
+                                <ArrowRightLeft size={14} />
+                                Cambiar Médico
+                            </button>
+                            <button
                                 onClick={handleDesasignar}
                                 disabled={saving}
                                 style={{

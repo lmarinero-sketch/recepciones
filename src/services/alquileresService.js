@@ -107,9 +107,10 @@ export async function fetchAsignaciones(periodo, sedeId = null) {
  * Asigna un médico a un slot (consultorio + día + franja)
  */
 export async function asignarMedico({ consultorioId, dia, franja, medicoId, periodo, esResidente = false, esRotativo = false }) {
+    // Use upsert to allow replacing the doctor on an already-occupied slot
     const { data, error } = await supabase
         .from('alq_asignaciones')
-        .insert({
+        .upsert({
             medico_id: medicoId,
             consultorio_id: consultorioId,
             dia_semana: dia,
@@ -117,6 +118,11 @@ export async function asignarMedico({ consultorioId, dia, franja, medicoId, peri
             periodo,
             es_residente: esResidente,
             es_rotativo: esRotativo,
+            estado: 'activo',
+            fecha_baja: null,
+            updated_at: new Date().toISOString(),
+        }, {
+            onConflict: 'consultorio_id,dia_semana,franja,periodo',
         })
         .select(`
             *,
@@ -125,7 +131,6 @@ export async function asignarMedico({ consultorioId, dia, franja, medicoId, peri
         `)
         .single();
     if (error) {
-        if (error.code === '23505') throw new Error('Este slot ya está ocupado');
         throw new Error(error.message);
     }
     return data;
