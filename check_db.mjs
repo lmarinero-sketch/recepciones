@@ -12,26 +12,27 @@ const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {
-    const phone = '5492645438114';
-    
-    const { data: messages } = await supabase
+    const { data: messages, error } = await supabase
         .from('whatsapp_messages')
-        .select('*')
-        .eq('phone', phone)
-        .order('created_at', { ascending: false })
-        .limit(3);
+        .select('content, raw_payload')
+        .ilike('content', '%plantilla%');
         
-    console.log('Last messages:');
-    messages.forEach(m => {
-        console.log(`[${m.direction}] content: '${m.content}' raw: ${JSON.stringify(m.raw_payload).substring(0, 200)}`);
-    });
-    
-    const { data: survey } = await supabase
-        .from('encuestas_preventivos')
-        .select('*')
-        .eq('telefono', phone);
+    if (error) {
+        console.error("Error:", error);
+        return;
+    }
         
-    console.log('\nSurvey record:', survey);
+    console.log(`Found ${messages.length} messages containing "plantilla" in content.`);
+    if (messages.length > 0) {
+        const byType = {};
+        messages.forEach(m => {
+            const template = m.raw_payload?.template_name || m.content;
+            byType[template] = (byType[template] || 0) + 1;
+        });
+        console.log('Breakdown:', byType);
+        console.log('Example content:', messages[0].content);
+        console.log('Example payload:', messages[0].raw_payload);
+    }
 }
 
 run().catch(console.error);
