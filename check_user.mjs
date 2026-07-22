@@ -24,7 +24,7 @@ async function run() {
         console.log("Creating user gcorrea...");
         const { data, error: createError } = await supabase.rpc('create_user', {
             p_usuario: 'gcorrea',
-            p_nombre: 'Guillermo Correa',
+            p_nombre: 'Gustavo Correa',
             p_password: '123456',
             p_iniciales: 'GC',
         });

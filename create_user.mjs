@@ -7,7 +7,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {
     const usuario = 'rmarun'; // Normalized username
-    const nombre = 'Roberto Marun'; // You can use anything or fetch if exists
+    const nombre = 'Romina Marun'; // You can use anything or fetch if exists
     const password = '123456';
     const iniciales = 'RM';
 
