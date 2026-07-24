@@ -111,10 +111,14 @@ export default function OcupacionPanel({ addToast }) {
     }, [modal?.type]);
 
     const filteredMedicos = useMemo(() => {
-        // Deduplicar médicos por nombre_display para evitar repetidos
+        // Deduplicar médicos por nombre_display para evitar repetidos, prefiriendo los que tienen matrícula
         const uniqueMedicosMap = new Map();
         for (const m of medicos) {
-            if (!uniqueMedicosMap.has(m.nombre_display)) {
+            const existing = uniqueMedicosMap.get(m.nombre_display);
+            if (!existing) {
+                uniqueMedicosMap.set(m.nombre_display, m);
+            } else if (!existing.matricula && m.matricula) {
+                // Preferir el registro más completo (con matrícula)
                 uniqueMedicosMap.set(m.nombre_display, m);
             }
         }
@@ -184,7 +188,7 @@ export default function OcupacionPanel({ addToast }) {
         if (!newMedico.nombre || !newMedico.apellido || saving) return;
         setSaving(true);
         try {
-            const display = `${newMedico.apellido.toUpperCase()} ${newMedico.nombre.charAt(0).toUpperCase()}`;
+            const display = `${newMedico.apellido.toUpperCase()} ${newMedico.nombre.toUpperCase()}`;
             const created = await createMedico({
                 ...newMedico,
                 nombre_display: display,
