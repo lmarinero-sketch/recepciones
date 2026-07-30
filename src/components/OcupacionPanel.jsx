@@ -16,6 +16,7 @@ import {
     fetchMedicos, asignarMedico, desasignarMedico, moverMedico,
     createMedico, copiarMesAnterior,
     buildGrilla, calcularMetricasLocal, getPeriodoActual,
+    fetchNuevosPrestadores, updateAsignacionEstadoColor,
     DIAS, FRANJAS, DIAS_LABELS, FRANJAS_LABELS,
 } from '../services/alquileresService';
 
@@ -42,6 +43,13 @@ const FRANJA_COLORS = {
     'tarde':  { bg: '#F0FDF4', border: '#22C55E', dot: '#22C55E' },
 };
 
+// ── Estados Color ──
+const ESTADOS_COLOR = [
+    { id: 'nuevo', label: 'Nuevo', bg: '#FEF08A', text: '#854D0E' }, // Amarillo
+    { id: 'ingresa_proximo_mes', label: 'Ingresa próximo mes', bg: '#FECACA', text: '#991B1B' }, // Rojo
+    { id: 'cambio_franja', label: 'Cambio de franja', bg: '#BAE6FD', text: '#075985' }, // Celeste
+];
+
 export default function OcupacionPanel({ addToast }) {
     // ── State ──
     const [sedes, setSedes] = useState([]);
@@ -52,6 +60,7 @@ export default function OcupacionPanel({ addToast }) {
     const [loading, setLoading] = useState(true);
     const [grilla, setGrilla] = useState({});
     const [metricas, setMetricas] = useState(null);
+    const [nuevosPrestadores, setNuevosPrestadores] = useState([]);
 
     // Modal state
     const [modal, setModal] = useState(null); // { type: 'asignar'|'detalle'|'mover', ... }
@@ -68,11 +77,15 @@ export default function OcupacionPanel({ addToast }) {
     useEffect(() => {
         (async () => {
             try {
-                const sedesData = await fetchSedes();
+                const [sedesData, prestadoresData] = await Promise.all([
+                    fetchSedes(),
+                    fetchNuevosPrestadores()
+                ]);
                 setSedes(sedesData);
+                setNuevosPrestadores(prestadoresData);
                 if (sedesData.length > 0) setSelectedSede(sedesData[0]);
             } catch (err) {
-                addToast?.('Error cargando sedes: ' + err.message, 'error');
+                addToast?.('Error cargando inicial: ' + err.message, 'error');
             }
         })();
     }, []);
@@ -145,6 +158,49 @@ export default function OcupacionPanel({ addToast }) {
         }
     };
 
+    const handleAsignarNuevoPrestador = async (prestador) => {
+        if (!modal || saving) return;
+        setSaving(true);
+        try {
+            // First create the medico since it comes from RRHH and may not be in alq_medicos yet
+            const display = prestador.nombre_completo.toUpperCase();
+            
+            // Try to find if already exists
+            const existingMedicos = await fetchMedicos({ search: display });
+            let medico = existingMedicos.find(m => m.nombre_display === display);
+            
+            if (!medico) {
+                // Split name roughly
+                const parts = prestador.nombre_completo.split(' ');
+                const apellido = parts[0];
+                const nombre = parts.slice(1).join(' ') || apellido;
+                medico = await createMedico({
+                    nombre,
+                    apellido,
+                    nombre_display: display,
+                    matricula: prestador.matricula || '',
+                    especialidad: prestador.servicio_especialidad || ''
+                });
+            }
+
+            await asignarMedico({
+                consultorioId: modal.consultorio.id,
+                dia: modal.dia,
+                franja: modal.franja,
+                medicoId: medico.id,
+                periodo,
+                estadoColor: 'nuevo' // Set as yellow automatically for new prestadores
+            });
+            addToast?.(`${display} asignado correctamente`, 'success');
+            setModal(null);
+            await loadData();
+        } catch (err) {
+            addToast?.(err.message, 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleAsignar = async (medico) => {
         if (!modal || saving) return;
         setSaving(true);
@@ -177,6 +233,24 @@ export default function OcupacionPanel({ addToast }) {
             addToast?.(`${a.medico?.nombre_display} dado de baja del slot`, 'success');
             setModal(null);
             await loadData();
+        } catch (err) {
+            addToast?.(err.message, 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleCambiarColor = async (colorId) => {
+        if (!modal?.asignacion || saving) return;
+        setSaving(true);
+        try {
+            await updateAsignacionEstadoColor(modal.asignacion.id, colorId);
+            setModal(prev => ({
+                ...prev,
+                asignacion: { ...prev.asignacion, estado_color: colorId }
+            }));
+            addToast?.('Estado actualizado', 'success');
+            await loadData(); // Reload grid
         } catch (err) {
             addToast?.(err.message, 'error');
         } finally {
@@ -404,7 +478,7 @@ export default function OcupacionPanel({ addToast }) {
                                                             ...tdCellStyle,
                                                             borderTop: isFirstFranja ? '2px solid var(--neutral-300)' : '1px solid var(--neutral-100)',
                                                             background: isDisabled ? '#F9FAFB' :
-                                                                isOccupied ? FRANJA_COLORS[franja].bg : 'white',
+                                                                isOccupied ? (ESTADOS_COLOR.find(ec => ec.id === asig.estado_color)?.bg || FRANJA_COLORS[franja].bg) : 'white',
                                                             cursor: isDisabled ? 'default' : 'pointer',
                                                             transition: 'all 0.15s',
                                                         }}
@@ -415,7 +489,7 @@ export default function OcupacionPanel({ addToast }) {
                                                         {isOccupied ? (
                                                             <div style={{
                                                                 fontWeight: 600,
-                                                                color: 'var(--neutral-800)',
+                                                                color: ESTADOS_COLOR.find(ec => ec.id === asig.estado_color)?.text || 'var(--neutral-800)',
                                                                 fontSize: '0.7rem',
                                                                 lineHeight: 1.2,
                                                                 textAlign: 'center',
@@ -471,7 +545,7 @@ export default function OcupacionPanel({ addToast }) {
                             <Search size={14} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--neutral-400)' }} />
                             <input
                                 type="text"
-                                placeholder="Buscar médico por nombre, matrícula o especialidad..."
+                                placeholder="Buscar médico existente por nombre, matrícula..."
                                 value={medicoSearch}
                                 onChange={e => setMedicoSearch(e.target.value)}
                                 autoFocus
@@ -483,8 +557,45 @@ export default function OcupacionPanel({ addToast }) {
                             />
                         </div>
 
+                        {/* Incorporaciones / Nuevos Prestadores */}
+                        {!medicoSearch && nuevosPrestadores.filter(p => p.sedes?.includes(selectedSede?.codigo)).length > 0 && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#854D0E', marginBottom: '8px', textTransform: 'uppercase' }}>
+                                    Incorporaciones Pendientes ({selectedSede?.nombre})
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    {nuevosPrestadores.filter(p => p.sedes?.includes(selectedSede?.codigo)).map(p => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => handleAsignarNuevoPrestador(p)}
+                                            disabled={saving}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '8px 12px', borderRadius: '8px',
+                                                border: '1px solid #FEF08A', background: '#FEF9C3',
+                                                cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = '#FEF08A'}
+                                            onMouseLeave={e => e.currentTarget.style.background = '#FEF9C3'}
+                                        >
+                                            <div>
+                                                <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#713F12' }}>{p.nombre_completo}</div>
+                                                <div style={{ fontSize: '0.7rem', color: '#A16207' }}>{p.servicio_especialidad}</div>
+                                            </div>
+                                            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#854D0E', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                Asignar <ArrowRightLeft size={12} />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Medicos list */}
-                        <div style={{ maxHeight: '280px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--neutral-200)' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--neutral-500)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                            Médicos Existentes
+                        </div>
+                        <div style={{ maxHeight: '240px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--neutral-200)' }}>
                             {filteredMedicos.map(m => (
                                 <button
                                     key={m.id}
@@ -577,6 +688,42 @@ export default function OcupacionPanel({ addToast }) {
                                 )}
                                 <span><Building2 size={12} style={{ marginRight: '4px' }} />Consultorio {modal.consultorio.numero} · {selectedSede?.nombre}</span>
                                 <span><Calendar size={12} style={{ marginRight: '4px' }} />{DIAS_LABELS[modal.dia]} · {FRANJAS_LABELS[modal.franja]}</span>
+                            </div>
+                        </div>
+
+                        {/* Selector de Estado/Color */}
+                        <div style={{ marginBottom: '20px' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--neutral-600)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                                Estado Visual del Slot
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={() => handleCambiarColor(null)}
+                                    disabled={saving}
+                                    style={{
+                                        padding: '6px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600,
+                                        border: modal.asignacion.estado_color == null ? '2px solid var(--neutral-400)' : '1px solid var(--neutral-300)',
+                                        background: modal.asignacion.estado_color == null ? 'var(--neutral-100)' : 'white',
+                                        color: 'var(--neutral-600)', cursor: 'pointer', transition: 'all 0.1s'
+                                    }}
+                                >
+                                    Normal
+                                </button>
+                                {ESTADOS_COLOR.map(color => (
+                                    <button
+                                        key={color.id}
+                                        onClick={() => handleCambiarColor(color.id)}
+                                        disabled={saving}
+                                        style={{
+                                            padding: '6px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600,
+                                            border: modal.asignacion.estado_color === color.id ? `2px solid ${color.text}` : `1px solid ${color.bg}`,
+                                            background: color.bg, color: color.text,
+                                            cursor: 'pointer', transition: 'all 0.1s', opacity: saving ? 0.7 : 1
+                                        }}
+                                    >
+                                        {color.label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 

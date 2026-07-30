@@ -75,6 +75,19 @@ export async function updateMedico(id, updates) {
 }
 
 // =============================================
+// NUEVOS PRESTADORES (INCORPORACIONES)
+// =============================================
+
+export async function fetchNuevosPrestadores() {
+    const { data, error } = await supabase
+        .from('nuevos_prestadores')
+        .select('*')
+        .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return data || [];
+}
+
+// =============================================
 // ASIGNACIONES
 // =============================================
 
@@ -106,7 +119,7 @@ export async function fetchAsignaciones(periodo, sedeId = null) {
 /**
  * Asigna un médico a un slot (consultorio + día + franja)
  */
-export async function asignarMedico({ consultorioId, dia, franja, medicoId, periodo, esResidente = false, esRotativo = false }) {
+export async function asignarMedico({ consultorioId, dia, franja, medicoId, periodo, esResidente = false, esRotativo = false, estadoColor = null }) {
     // Use upsert to allow replacing the doctor on an already-occupied slot
     const { data, error } = await supabase
         .from('alq_asignaciones')
@@ -118,6 +131,7 @@ export async function asignarMedico({ consultorioId, dia, franja, medicoId, peri
             periodo,
             es_residente: esResidente,
             es_rotativo: esRotativo,
+            estado_color: estadoColor,
             estado: 'activo',
             fecha_baja: null,
             updated_at: new Date().toISOString(),
@@ -133,6 +147,24 @@ export async function asignarMedico({ consultorioId, dia, franja, medicoId, peri
     if (error) {
         throw new Error(error.message);
     }
+    return data;
+}
+
+/**
+ * Actualiza el estado_color de un slot asignado
+ */
+export async function updateAsignacionEstadoColor(asignacionId, estadoColor) {
+    const { data, error } = await supabase
+        .from('alq_asignaciones')
+        .update({ estado_color: estadoColor, updated_at: new Date().toISOString() })
+        .eq('id', asignacionId)
+        .select(`
+            *,
+            medico:alq_medicos(id, nombre_display, matricula, especialidad, estado),
+            consultorio:alq_consultorios(id, numero, sede_id, tipo, orden)
+        `)
+        .single();
+    if (error) throw new Error(error.message);
     return data;
 }
 
@@ -174,6 +206,7 @@ export async function moverMedico(asignacionId, { nuevoConsultorioId, nuevoDia, 
         periodo: periodo || current.periodo,
         esResidente: current.es_residente,
         esRotativo: current.es_rotativo,
+        estadoColor: current.estado_color,
     });
 }
 
@@ -227,6 +260,7 @@ export async function copiarMesAnterior(sedeId, periodoDestino) {
             periodo: periodoDestino,
             es_residente: a.es_residente || false,
             es_rotativo: a.es_rotativo || false,
+            estado_color: null, // Reset color when copying to a new month
         });
     }
 
