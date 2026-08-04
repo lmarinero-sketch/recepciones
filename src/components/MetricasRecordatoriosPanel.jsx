@@ -39,27 +39,45 @@ function StatCard({ icon: Icon, label, value, sub, color, bg }) {
 }
 
 function aggregate(data, selectedYear) {
-    const hoy = new Date().toISOString().split('T')[0];
     const byMonth = {};
     const osCounts = {};
     const medicoCounts = {};
     let totalPresentes = 0, totalAusentes = 0, totalPendientes = 0;
     let filteredCount = 0;
 
+    // Agrupar registros por Visita Única de Paciente (DNI + Fecha) para no duplicar prácticas (Lab, Eco, etc.)
+    const uniqueVisitsMap = new Map();
     data.forEach(r => {
         if (!r.fecha) return;
         if (selectedYear !== 'todos' && !r.fecha.startsWith(selectedYear)) return;
+
+        const key = `${r.dni || r.paciente}_${r.fecha}`;
+        if (!uniqueVisitsMap.has(key)) {
+            uniqueVisitsMap.set(key, { ...r });
+        } else {
+            const existing = uniqueVisitsMap.get(key);
+            if (r.asistencia_efectiva === 'Presente') {
+                existing.asistencia_efectiva = 'Presente';
+            }
+        }
+    });
+
+    const uniqueVisits = Array.from(uniqueVisitsMap.values());
+
+    uniqueVisits.forEach(r => {
         filteredCount++;
         const asis = r.asistencia_efectiva;
+        const isAusente = asis === 'Ausente' || asis === 'Ausencia justificada' || asis === 'Ausencia injustificada' || asis === 'Anulación Cita Online';
+
         if (asis === 'Presente') totalPresentes++;
-        else if (asis === 'Ausente') totalAusentes++;
+        else if (isAusente) totalAusentes++;
         else totalPendientes++;
 
         const month = r.fecha.substring(0, 7);
         if (!byMonth[month]) byMonth[month] = { agendados: 0, presentes: 0, ausentes: 0, pendientes: 0 };
         byMonth[month].agendados++;
         if (asis === 'Presente') byMonth[month].presentes++;
-        else if (asis === 'Ausente') byMonth[month].ausentes++;
+        else if (isAusente) byMonth[month].ausentes++;
         else byMonth[month].pendientes++;
 
         const os = r.obra_social || 'Particular/Sin OS';
@@ -70,7 +88,6 @@ function aggregate(data, selectedYear) {
 
     const months = Object.keys(byMonth).sort().map((m, idx, arr) => {
         const curr = byMonth[m];
-        const prev = idx > 0 ? byMonth[arr[idx - 1]] : null;
         const tasaAsistencia = curr.agendados > 0 ? Math.round((curr.presentes / (curr.presentes + curr.ausentes || 1)) * 100) : 0;
         const [y, mo] = m.split('-');
         return {

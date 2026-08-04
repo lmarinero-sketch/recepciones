@@ -55,6 +55,7 @@ async function fetchChequeosDNIs(fecha, isMensual, obraSocial) {
             .from('recepciones_visitas')
             .select('dni, paciente')
             .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
+            .eq('asistencia', 'Presente')
             .range(from, to);
 
         if (isMensual) {
@@ -323,6 +324,7 @@ export async function fetchMarketingCandidates(onProgress = null) {
             .from('recepciones_visitas')
             .select('fecha, dni, paciente, telefono1, telefono2, obra_social, departamento, centro')
             .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
+            .eq('asistencia', 'Presente')
             .not('fecha', 'is', null)
             .not('dni', 'is', null)
             .range(from, to);

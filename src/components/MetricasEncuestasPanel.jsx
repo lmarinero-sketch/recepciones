@@ -30,11 +30,12 @@ export default function MetricasEncuestasPanel({ addToast }) {
     // Calculate metrics
     const metrics = useMemo(() => {
         const totalEnviadas = encuestas.length;
+        const respondidas = encuestas.filter(e => (e.q1_nps !== null && e.q1_nps !== undefined) || e.q2_claridad || e.q3_agilidad || e.estado === 'COMPLETADA');
+        const respondidasCount = respondidas.length;
         const completadas = encuestas.filter(e => e.estado === 'COMPLETADA');
         const completadasCount = completadas.length;
         
         // NPS = % Promotores (9-10) - % Detractores (1-6)
-        // Neutros (7-8)
         let promotores = 0;
         let detractores = 0;
         let neutros = 0;
@@ -42,8 +43,10 @@ export default function MetricasEncuestasPanel({ addToast }) {
 
         // Distribucion Q2 (Claridad)
         const q2Dist = { A: 0, B: 0, C: 0 };
+        let q2Total = 0;
         // Distribucion Q3 (Agilidad)
         const q3Dist = { A: 0, B: 0, C: 0, D: 0 };
+        let q3Total = 0;
 
         const comentarios = [];
 
@@ -54,8 +57,14 @@ export default function MetricasEncuestasPanel({ addToast }) {
                 else if (e.q1_nps <= 6) detractores++;
                 else neutros++;
             }
-            if (e.q2_claridad) q2Dist[e.q2_claridad] = (q2Dist[e.q2_claridad] || 0) + 1;
-            if (e.q3_agilidad) q3Dist[e.q3_agilidad] = (q3Dist[e.q3_agilidad] || 0) + 1;
+            if (e.q2_claridad) {
+                q2Dist[e.q2_claridad] = (q2Dist[e.q2_claridad] || 0) + 1;
+                q2Total++;
+            }
+            if (e.q3_agilidad) {
+                q3Dist[e.q3_agilidad] = (q3Dist[e.q3_agilidad] || 0) + 1;
+                q3Total++;
+            }
             
             if (e.cierre_comentario && e.cierre_comentario.trim().length > 0) {
                 comentarios.push({
@@ -74,10 +83,11 @@ export default function MetricasEncuestasPanel({ addToast }) {
             nps = Math.round(((promotores / validNpsCount) - (detractores / validNpsCount)) * 100);
         }
 
-        const responseRate = totalEnviadas > 0 ? Math.round((completadasCount / totalEnviadas) * 100) : 0;
+        const responseRate = totalEnviadas > 0 ? (respondidasCount / totalEnviadas * 100).toFixed(1) : 0;
 
         return {
             totalEnviadas,
+            respondidasCount,
             completadasCount,
             responseRate,
             nps,
@@ -86,7 +96,9 @@ export default function MetricasEncuestasPanel({ addToast }) {
             neutros,
             detractores,
             q2Dist,
+            q2Total,
             q3Dist,
+            q3Total,
             comentarios
         };
     }, [encuestas]);
@@ -140,7 +152,7 @@ export default function MetricasEncuestasPanel({ addToast }) {
                                 <div>
                                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b' }}>{metrics.responseRate}%</div>
                                     <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>Tasa de Respuesta</div>
-                                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{metrics.completadasCount} de {metrics.totalEnviadas} completadas</div>
+                                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{metrics.respondidasCount} de {metrics.totalEnviadas} respondieron ({metrics.completadasCount} finalizadas)</div>
                                 </div>
                             </div>
                             
@@ -149,7 +161,7 @@ export default function MetricasEncuestasPanel({ addToast }) {
                                     <Trophy size={24} color="#10b981" />
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b' }}>{metrics.nps}</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b' }}>{metrics.nps > 0 ? `+${metrics.nps}` : metrics.nps}</div>
                                     <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>Net Promoter Score</div>
                                     <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Promotores: {metrics.promotores} | Detractores: {metrics.detractores}</div>
                                 </div>
@@ -183,18 +195,18 @@ export default function MetricasEncuestasPanel({ addToast }) {
                             <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                 <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', marginBottom: '16px' }}>Claridad Médica (Q2)</h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <BarItem label="A. Muy claro" count={metrics.q2Dist.A || 0} total={metrics.validNpsCount} color="#10b981" />
-                                    <BarItem label="B. Algunas dudas" count={metrics.q2Dist.B || 0} total={metrics.validNpsCount} color="#f59e0b" />
-                                    <BarItem label="C. Faltó claridad" count={metrics.q2Dist.C || 0} total={metrics.validNpsCount} color="#ef4444" />
+                                    <BarItem label="A. Muy claro" count={metrics.q2Dist.A || 0} total={metrics.q2Total} color="#10b981" />
+                                    <BarItem label="B. Algunas dudas" count={metrics.q2Dist.B || 0} total={metrics.q2Total} color="#f59e0b" />
+                                    <BarItem label="C. Faltó claridad" count={metrics.q2Dist.C || 0} total={metrics.q2Total} color="#ef4444" />
                                 </div>
                             </div>
                             <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                 <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b', marginBottom: '16px' }}>Agilidad del Circuito (Q3)</h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <BarItem label="A. Excelente" count={metrics.q3Dist.A || 0} total={metrics.validNpsCount} color="#10b981" />
-                                    <BarItem label="B. Buena" count={metrics.q3Dist.B || 0} total={metrics.validNpsCount} color="#3b82f6" />
-                                    <BarItem label="C. Regular" count={metrics.q3Dist.C || 0} total={metrics.validNpsCount} color="#f59e0b" />
-                                    <BarItem label="D. Mala" count={metrics.q3Dist.D || 0} total={metrics.validNpsCount} color="#ef4444" />
+                                    <BarItem label="A. Excelente" count={metrics.q3Dist.A || 0} total={metrics.q3Total} color="#10b981" />
+                                    <BarItem label="B. Buena" count={metrics.q3Dist.B || 0} total={metrics.q3Total} color="#3b82f6" />
+                                    <BarItem label="C. Regular" count={metrics.q3Dist.C || 0} total={metrics.q3Total} color="#f59e0b" />
+                                    <BarItem label="D. Mala" count={metrics.q3Dist.D || 0} total={metrics.q3Total} color="#ef4444" />
                                 </div>
                             </div>
                         </div>

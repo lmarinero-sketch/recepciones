@@ -15,18 +15,14 @@ const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#64748b'
 function aggregateData(data, selectedYear) {
     const byMonth = {};
     const uniqueAll = new Set();
+    const uniquePresentes = new Set();
     const obraSocialCounts = {};
 
     data.forEach(v => {
         if (!v.fecha || !v.dni) return;
         if (selectedYear !== 'todos' && !v.fecha.startsWith(selectedYear)) return;
 
-        // Contar pacientes únicos globales y por obra social
-        if (!uniqueAll.has(v.dni)) {
-            uniqueAll.add(v.dni);
-            const os = v.obra_social || 'Particular/Sin OS';
-            obraSocialCounts[os] = (obraSocialCounts[os] || 0) + 1;
-        }
+        uniqueAll.add(v.dni);
 
         const month = v.fecha.substring(0, 7);
         if (!byMonth[month]) {
@@ -34,7 +30,15 @@ function aggregateData(data, selectedYear) {
         }
         
         byMonth[month].dnis.add(v.dni);
-        if (v.asistencia === 'Presente') byMonth[month].presentes.add(v.dni);
+        if (v.asistencia === 'Presente') {
+            byMonth[month].presentes.add(v.dni);
+            // Contar pacientes con chequeo realizado y por obra social
+            if (!uniquePresentes.has(v.dni)) {
+                uniquePresentes.add(v.dni);
+                const os = v.obra_social || 'Particular/Sin OS';
+                obraSocialCounts[os] = (obraSocialCounts[os] || 0) + 1;
+            }
+        }
         if (v.asistencia === 'Ausente') byMonth[month].ausentes.add(v.dni);
     });
 
@@ -42,14 +46,15 @@ function aggregateData(data, selectedYear) {
     const result = months.map((m, idx) => {
         const prev = idx > 0 ? byMonth[months[idx - 1]] : null;
         const curr = byMonth[m];
-        const change = prev && prev.dnis.size > 0 ? ((curr.dnis.size - prev.dnis.size) / prev.dnis.size * 100) : 0;
+        const change = prev && prev.presentes.size > 0 ? ((curr.presentes.size - prev.presentes.size) / prev.presentes.size * 100) : 0;
         const [y, mo] = m.split('-');
         return {
             month: m,
             label: `${MONTH_NAMES[parseInt(mo, 10) - 1]} ${y.slice(2)}`,
             labelFull: `${MONTH_NAMES[parseInt(mo, 10) - 1]} ${y}`,
             year: y,
-            pacientes: curr.dnis.size,
+            agendados: curr.dnis.size,
+            pacientes: curr.presentes.size,
             presentes: curr.presentes.size,
             ausentes: curr.ausentes.size,
             change: Math.round(change),
@@ -71,7 +76,7 @@ function aggregateData(data, selectedYear) {
         topOS.push({ name: 'Otras', value: othersCount });
     }
 
-    return { months: result, uniquePatients: uniqueAll.size, topOS };
+    return { months: result, uniquePatients: uniquePresentes.size, totalAgendados: uniqueAll.size, topOS };
 }
 
 function StatCard({ icon: Icon, label, value, sub, color, bg }) {
@@ -112,7 +117,7 @@ function CustomTooltip({ active, payload }) {
             <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1e293b', marginBottom: '8px' }}>{d.labelFull}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                    <span style={{ color: '#64748b' }}>Pacientes Atendidos</span>
+                    <span style={{ color: '#64748b' }}>Chequeos Realizados</span>
                     <span style={{ fontWeight: 700, color: '#10b981' }}>{d.pacientes.toLocaleString()}</span>
                 </div>
                 {d.change !== 0 && (
@@ -247,7 +252,7 @@ export default function MetricasChequeoPanel({ addToast }) {
                         Métricas de Chequeos
                     </h2>
                 <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 50px', maxWidth: '600px', lineHeight: 1.5 }}>
-                    Análisis del volumen total de la agenda. <strong>"Paciente Atendido"</strong> contabiliza a todo paciente único que tuvo un turno de CHQ en el mes, sin importar si luego fue marcado como Presente o Ausente. Toda la data se alimenta de la tabla histórica de visitas.
+                    Análisis de chequeos preventivos realizados. <strong>"Chequeo Realizado"</strong> contabiliza únicamente pacientes con asistencia Presente. Toda la data se alimenta de la tabla histórica de visitas.
                 </p>
             </div>
             <button onClick={loadData} disabled={loading} style={{
@@ -284,11 +289,11 @@ export default function MetricasChequeoPanel({ addToast }) {
 
             {/* KPI Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '20px', flexShrink: 0 }}>
-                <StatCard icon={Users} label="Total Pacientes Únicos" value={stats.uniquePatients.toLocaleString()} color="#10b981" bg="#ecfdf5" />
+                <StatCard icon={Users} label="Chequeos Realizados" value={stats.uniquePatients.toLocaleString()} sub={`de ${aggregated.totalAgendados.toLocaleString()} agendados`} color="#10b981" bg="#ecfdf5" />
                 <StatCard icon={CalendarCheck} label="Turnos Agendados" value={scheduledData.length.toLocaleString()} sub={`${scheduledData.filter(s => s.estado === 'confirmo').length} ya confirmaron asistencia`} color="#0ea5e9" bg="#e0f2fe" />
                 <StatCard icon={Calendar} label="Promedio Mensual" value={stats.avg.toLocaleString()} color="#3b82f6" bg="#eff6ff" />
                 <StatCard icon={TrendingUp} label="Mes Pico" value={stats.peak.labelFull || '-'}
-                    sub={stats.peak.pacientes > 0 ? `${stats.peak.pacientes.toLocaleString()} pacientes` : ''} color="#f59e0b" bg="#fffbeb" />
+                    sub={stats.peak.pacientes > 0 ? `${stats.peak.pacientes.toLocaleString()} realizados` : ''} color="#f59e0b" bg="#fffbeb" />
                 <StatCard icon={Building2} label="Obra Social Principal" value={stats.topOS.name.substring(0, 15) + (stats.topOS.name.length > 15 ? '...' : '')}
                     sub={`${stats.topOS.value.toLocaleString()} pacientes`} color="#8b5cf6" bg="#f5f3ff" />
             </div>
@@ -338,15 +343,15 @@ export default function MetricasChequeoPanel({ addToast }) {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                             <div>
                                 <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
-                                    Evolución Mensual de Pacientes
+                                    Evolución Mensual de Chequeos Realizados
                                 </h3>
                                 <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0 0', maxWidth: '400px' }}>
-                                    Muestra el volumen total de pacientes agendados por mes. Incluye a todos los pacientes (Presentes y Ausentes).
+                                    Muestra los chequeos efectivamente realizados por mes (solo pacientes con asistencia Presente).
                                 </p>
                             </div>
                             <div style={{ display: 'flex', gap: '16px', fontSize: '0.72rem', color: '#94a3b8' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ width: 10, height: 10, borderRadius: 3, background: '#10b981' }} /> Pacientes
+                                    <span style={{ width: 10, height: 10, borderRadius: 3, background: '#10b981' }} /> Realizados
                                 </span>
                             </div>
                         </div>
@@ -455,7 +460,7 @@ export default function MetricasChequeoPanel({ addToast }) {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                             <thead>
                                 <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
-                                    {['Mes', 'Pacientes Únicos', 'Presentes', 'Ausentes', 'Tendencia'].map(h => (
+                                    {['Mes', 'Agendados', 'Realizados', 'Ausentes', 'Tendencia'].map(h => (
                                         <th key={h} style={{
                                             padding: '10px 16px', textAlign: h === 'Mes' ? 'left' : 'right',
                                             fontWeight: 700, color: '#64748b', fontSize: '0.72rem',
@@ -476,10 +481,10 @@ export default function MetricasChequeoPanel({ addToast }) {
                                         <td style={{ padding: '10px 16px', fontWeight: 700, color: '#1e293b' }}>
                                             {m.labelFull}
                                         </td>
-                                        <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, color: '#10b981' }}>
-                                            {m.pacientes.toLocaleString()}
-                                        </td>
                                         <td style={{ padding: '10px 16px', textAlign: 'right', color: '#64748b' }}>
+                                            {m.agendados.toLocaleString()}
+                                        </td>
+                                        <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, color: '#10b981' }}>
                                             {m.presentes.toLocaleString()}
                                         </td>
                                         <td style={{ padding: '10px 16px', textAlign: 'right', color: '#64748b' }}>
@@ -508,11 +513,11 @@ export default function MetricasChequeoPanel({ addToast }) {
                             <tfoot>
                                 <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
                                     <td style={{ padding: '12px 16px', fontWeight: 800, color: '#1e293b' }}>TOTAL</td>
+                                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#64748b' }}>
+                                        {aggregated.totalAgendados.toLocaleString()}
+                                    </td>
                                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#10b981', fontSize: '0.9rem' }}>
                                         {stats.uniquePatients.toLocaleString()}
-                                    </td>
-                                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#64748b' }}>
-                                        {aggregated.months.reduce((s, m) => s + m.presentes, 0).toLocaleString()}
                                     </td>
                                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#64748b' }}>
                                         {aggregated.months.reduce((s, m) => s + m.ausentes, 0).toLocaleString()}

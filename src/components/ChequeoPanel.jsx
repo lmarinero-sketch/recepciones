@@ -423,7 +423,7 @@ export default function ChequeoPanel({ addToast }) {
                     <CalendarClock size={20} color="#1d4ed8" />
                     <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                            Pacientes con Chequeo Preventivo (CHQ) el {isMensual ? 'mes' : 'día'}:
+                            Pacientes con Chequeo Realizado (CHQ) el {isMensual ? 'mes' : 'día'}:
                         </div>
                         <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'capitalize' }}>
                             {isMensual ? formatDateMonth(targetDate) : formatDateLong(targetDate)}
@@ -470,7 +470,7 @@ export default function ChequeoPanel({ addToast }) {
                 {/* Stats Cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
                     {[
-                        { label: 'Pacientes CHQ', value: stats.totalPacientes.toLocaleString(), icon: Users, color: '#3b82f6', bg: '#eff6ff' },
+                        { label: 'Chequeos Realizados', value: stats.totalPacientes.toLocaleString(), icon: Users, color: '#3b82f6', bg: '#eff6ff' },
                         { label: 'Con Teléfono', value: stats.conTelefono.toLocaleString(), icon: UserCheck, color: '#10b981', bg: '#ecfdf5' },
                         { label: 'Sin Teléfono', value: stats.sinTelefono.toLocaleString(), icon: AlertCircle, color: '#f59e0b', bg: '#fffbeb' },
                     ].map((stat, i) => (
