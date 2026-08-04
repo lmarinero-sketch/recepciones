@@ -52,10 +52,10 @@ async function paginateQuery(buildQuery, onProgress = null) {
 async function fetchChequeosDNIs(fecha, isMensual, obraSocial) {
     const data = await paginateQuery((from, to) => {
         let query = supabase
-            .from('recepciones_visitas')
+            .from('visitas_chequeo')
             .select('dni, paciente')
             .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
-            .eq('asistencia', 'Presente')
+            .ilike('asistencia', 'Presente')
             .range(from, to);
 
         if (isMensual) {
@@ -108,7 +108,7 @@ async function fetchVisitasByDNIs(dnis, onProgress = null) {
         const chunk = dnis.slice(i, i + CHUNK_SIZE);
         const chunkData = await paginateQuery((from, to) =>
             supabase
-                .from('recepciones_visitas')
+                .from('visitas_chequeo')
                 .select('*')
                 .in('dni', chunk)
                 .order('fecha', { ascending: false })
@@ -135,20 +135,20 @@ function agruparPorPaciente(data) {
             map[key] = {
                 dni: v.dni,
                 paciente: v.paciente,
-                telefono1: v.telefono1,
-                telefono2: v.telefono2,
+                telefono1: v.telefono1 || v.telefono1_paciente,
+                telefono2: v.telefono2 || v.telefono2_paciente,
                 obra_social: v.obra_social,
-                direccion: v.direccion,
+                direccion: v.direccion || v.direccion_paciente,
                 departamento: v.departamento,
                 ultima_visita: v.fecha,
                 visitas: [],
             };
         }
-        if (!map[key].telefono1 && v.telefono1) {
-            map[key].telefono1 = v.telefono1;
+        if (!map[key].telefono1 && (v.telefono1 || v.telefono1_paciente)) {
+            map[key].telefono1 = v.telefono1 || v.telefono1_paciente;
         }
-        if (!map[key].telefono2 && v.telefono2) {
-            map[key].telefono2 = v.telefono2;
+        if (!map[key].telefono2 && (v.telefono2 || v.telefono2_paciente)) {
+            map[key].telefono2 = v.telefono2 || v.telefono2_paciente;
         }
 
         map[key].visitas.push({
@@ -230,7 +230,7 @@ export async function fetchPacientesChequeo(options = {}, onProgress = null) {
 export async function fetchEspecialidades() {
     // Intentar traer los datos más recientes para no descargar millones de registros
     const { data } = await supabase
-        .from('recepciones_visitas')
+        .from('visitas_chequeo')
         .select('especialidad')
         .not('especialidad', 'is', null)
         .order('created_at', { ascending: false })
@@ -247,7 +247,7 @@ export async function fetchObrasSociales() {
     // Evitamos descargar toda la base usando limit.
     // Lo ideal en el futuro es crear una RPC en Supabase: supabase.rpc('get_obras_sociales')
     const { data } = await supabase
-        .from('recepciones_visitas')
+        .from('visitas_chequeo')
         .select('obra_social')
         .not('obra_social', 'is', null)
         .order('created_at', { ascending: false })
@@ -262,7 +262,7 @@ export async function fetchObrasSociales() {
 
 export async function fetchCentros() {
     const { data } = await supabase
-        .from('recepciones_visitas')
+        .from('visitas_chequeo')
         .select('centro')
         .not('centro', 'is', null)
         .order('created_at', { ascending: false })
@@ -280,7 +280,7 @@ export async function fetchCentros() {
  */
 export async function updateAsistencia(id, asistencia) {
     const { error } = await supabase
-        .from('recepciones_visitas')
+        .from('visitas_chequeo')
         .update({ asistencia })
         .eq('id', id);
 
@@ -300,7 +300,7 @@ export async function fetchChequeoMetrics(onProgress = null) {
 
     const data = await paginateQuery((from, to) => {
         return supabase
-            .from('recepciones_visitas')
+            .from('visitas_chequeo')
             .select('fecha, dni, obra_social, centro, asistencia')
             .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
             .not('fecha', 'is', null)
@@ -321,10 +321,10 @@ export async function fetchMarketingCandidates(onProgress = null) {
 
     const data = await paginateQuery((from, to) => {
         return supabase
-            .from('recepciones_visitas')
-            .select('fecha, dni, paciente, telefono1, telefono2, obra_social, departamento, centro')
+            .from('visitas_chequeo')
+            .select('fecha, dni, paciente, telefono1, telefono1_paciente, telefono2, telefono2_paciente, obra_social, departamento, centro')
             .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
-            .eq('asistencia', 'Presente')
+            .ilike('asistencia', 'Presente')
             .not('fecha', 'is', null)
             .not('dni', 'is', null)
             .range(from, to);
@@ -336,12 +336,14 @@ export async function fetchMarketingCandidates(onProgress = null) {
     const byDNI = {};
     data.forEach(v => {
         if (!v.dni) return;
+        const tel1 = v.telefono1 || v.telefono1_paciente;
+        const tel2 = v.telefono2 || v.telefono2_paciente;
         if (!byDNI[v.dni]) {
             byDNI[v.dni] = {
                 dni: v.dni,
                 paciente: v.paciente,
-                telefono1: v.telefono1,
-                telefono2: v.telefono2,
+                telefono1: tel1,
+                telefono2: tel2,
                 obra_social: v.obra_social,
                 departamento: v.departamento,
                 centro: v.centro,
@@ -350,8 +352,8 @@ export async function fetchMarketingCandidates(onProgress = null) {
             };
         }
         byDNI[v.dni].total_chq++;
-        if (!byDNI[v.dni].telefono1 && v.telefono1) {
-            byDNI[v.dni].telefono1 = v.telefono1;
+        if (!byDNI[v.dni].telefono1 && tel1) {
+            byDNI[v.dni].telefono1 = tel1;
         }
         if (v.fecha > byDNI[v.dni].ultima_chq) {
             byDNI[v.dni].ultima_chq = v.fecha;
@@ -387,10 +389,10 @@ export async function fetchPacientesConAsistencia(options = {}, onProgress = nul
     // Query: CHQ visits with asistencia = 'presente' in date range
     const data = await paginateQuery((from, to) => {
         let query = supabase
-            .from('recepciones_visitas')
+            .from('visitas_chequeo')
             .select('*')
             .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
-            .eq('asistencia', 'presente')
+            .ilike('asistencia', 'Presente')
             .gte('fecha', fechaDesde)
             .lte('fecha', fechaHasta)
             .order('fecha', { ascending: false })
