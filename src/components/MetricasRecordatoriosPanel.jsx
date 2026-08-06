@@ -5,8 +5,8 @@ import {
     CalendarDays, Bell, CheckCircle2, XCircle, Clock
 } from 'lucide-react';
 import {
-    ComposedChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-    ResponsiveContainer, Area, PieChart, Pie, Cell, Legend
+    ComposedChart, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+    ResponsiveContainer, Area, PieChart, Pie, Cell, Legend, ReferenceLine
 } from 'recharts';
 import { fetchRecordatoriosMetrics } from '../services/recordatoriosService';
 
@@ -38,7 +38,7 @@ function StatCard({ icon: Icon, label, value, sub, color, bg }) {
     );
 }
 
-function aggregate(data, selectedYear) {
+function aggregate(data, fechaDesde, fechaHasta) {
     const byMonth = {};
     const osCounts = {};
     const medicoCounts = {};
@@ -49,7 +49,8 @@ function aggregate(data, selectedYear) {
     const uniqueVisitsMap = new Map();
     data.forEach(r => {
         if (!r.fecha) return;
-        if (selectedYear !== 'todos' && !r.fecha.startsWith(selectedYear)) return;
+        if (fechaDesde && r.fecha < fechaDesde) return;
+        if (fechaHasta && r.fecha > fechaHasta) return;
 
         const key = `${r.dni || r.paciente}_${r.fecha}`;
         if (!uniqueVisitsMap.has(key)) {
@@ -110,11 +111,36 @@ function aggregate(data, selectedYear) {
     return { months, topOS, topMedicos, totalPresentes, totalAusentes, totalPendientes, total: filteredCount, tasaGlobal };
 }
 
+function aggregateYoY(data) {
+    const byMonth = {};
+    const uniqueVisitsMap = new Map();
+    
+    // Filtramos únicas por paciente+fecha
+    data.forEach(r => {
+        if (!r.fecha) return;
+        const key = `${r.dni || r.paciente}_${r.fecha}`;
+        if (!uniqueVisitsMap.has(key)) {
+            uniqueVisitsMap.set(key, { ...r });
+        }
+    });
+
+    // Agrupamos por mes y año
+    Array.from(uniqueVisitsMap.values()).forEach(r => {
+        const [y, mo] = r.fecha.split('-');
+        const monthIndex = parseInt(mo, 10) - 1;
+        if (!byMonth[monthIndex]) byMonth[monthIndex] = { name: MONTH_NAMES[monthIndex], index: monthIndex };
+        byMonth[monthIndex][y] = (byMonth[monthIndex][y] || 0) + 1; // Contamos Agendados (Total de turnos)
+    });
+    
+    return Object.values(byMonth).sort((a, b) => a.index - b.index);
+}
+
 export default function MetricasRecordatoriosPanel({ addToast }) {
     const [rawData, setRawData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [progress, setProgress] = useState('');
-    const [selectedYear, setSelectedYear] = useState('todos');
+    const [fechaDesde, setFechaDesde] = useState('');
+    const [fechaHasta, setFechaHasta] = useState('');
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -139,7 +165,12 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
         return [...ys].sort().reverse();
     }, [rawData]);
 
-    const agg = useMemo(() => aggregate(rawData, selectedYear), [rawData, selectedYear]);
+    const agg = useMemo(() => aggregate(rawData, fechaDesde, fechaHasta), [rawData, fechaDesde, fechaHasta]);
+    const yoyData = useMemo(() => aggregateYoY(rawData), [rawData]); // YoY siempre analiza toda la historia
+    
+    const avgAgendados = useMemo(() => {
+        return agg.months.length > 0 ? Math.round(agg.total / agg.months.length) : 0;
+    }, [agg.total, agg.months.length]);
 
     if (loading) {
         return (
@@ -173,27 +204,25 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                 }}><RefreshCw size={14} /> Actualizar</button>
             </div>
 
-            {/* Year Tabs */}
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexShrink: 0, flexWrap: 'wrap' }}>
-                <button
-                    onClick={() => setSelectedYear('todos')}
-                    style={{
-                        padding: '6px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer',
-                        fontSize: '0.78rem', fontWeight: 700, transition: 'all .15s',
-                        background: selectedYear === 'todos' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '#f1f5f9',
-                        color: selectedYear === 'todos' ? '#fff' : '#64748b',
-                        boxShadow: selectedYear === 'todos' ? '0 2px 8px rgba(245,158,11,.3)' : 'none',
-                    }}
-                >Todos los años</button>
-                {years.map(y => (
-                    <button key={y} onClick={() => setSelectedYear(y)} style={{
-                        padding: '6px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer',
-                        fontSize: '0.78rem', fontWeight: 700, transition: 'all .15s',
-                        background: selectedYear === y ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#f1f5f9',
-                        color: selectedYear === y ? '#fff' : '#64748b',
-                        boxShadow: selectedYear === y ? '0 2px 8px rgba(59,130,246,.3)' : 'none',
-                    }}>{y}</button>
-                ))}
+            {/* Date Filters */}
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Desde:</span>
+                    <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} style={{
+                        padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#1e293b', fontSize: '0.8rem', background: '#fff'
+                    }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Hasta:</span>
+                    <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} style={{
+                        padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#1e293b', fontSize: '0.8rem', background: '#fff'
+                    }} />
+                </div>
+                {(fechaDesde || fechaHasta) && (
+                    <button onClick={() => { setFechaDesde(''); setFechaHasta(''); }} style={{
+                        padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#ef4444', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
+                    }}>Limpiar filtros</button>
+                )}
             </div>
 
             {/* KPI Cards */}
@@ -230,6 +259,7 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                                         labelFormatter={l => agg.months.find(m => m.label === l)?.labelFull || l}
                                     />
                                     <Legend wrapperStyle={{ fontSize: '0.75rem', paddingTop: '10px' }} formatter={v => v === 'presentes' ? 'Presentes' : v === 'ausentes' ? 'Ausentes' : 'Pendientes'} />
+                                    <ReferenceLine y={avgAgendados} stroke="#64748b" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: `Promedio Total: ${avgAgendados}`, fill: '#64748b', fontSize: 11, fontWeight: 700 }} />
                                     <Bar dataKey="presentes" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
                                     <Bar dataKey="ausentes" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
                                     <Bar dataKey="pendientes" stackId="a" fill="#fbbf24" radius={[4, 4, 0, 0]} />
@@ -238,6 +268,37 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                         </div>
                     ) : (
                         <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos</div>
+                    )}
+                </div>
+
+                {/* Comparativa Interanual YoY */}
+                <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <TrendingUp size={18} color="#3b82f6" /> Comparativa Interanual (Volumen de Turnos Agendados)
+                    </h3>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 16px 0', maxWidth: '600px' }}>
+                        Analiza cómo venimos performando comparando el total de turnos mes a mes entre los diferentes años. (Este gráfico siempre evalúa toda la historia disponible, ignorando el filtro).
+                    </p>
+                    {yoyData.length > 0 ? (
+                        <div style={{ height: 300 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={yoyData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
+                                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                    <Tooltip
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 30px rgba(0,0,0,.12)' }}
+                                        itemStyle={{ fontSize: '0.85rem', fontWeight: 600 }}
+                                    />
+                                    <Legend wrapperStyle={{ fontSize: '0.75rem', paddingTop: '10px' }} />
+                                    {[...years].reverse().map((year, i) => (
+                                        <Line key={year} type="monotone" dataKey={year} name={`Año ${year}`} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                                    ))}
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos</div>
                     )}
                 </div>
 
