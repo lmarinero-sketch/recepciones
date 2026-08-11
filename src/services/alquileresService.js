@@ -261,17 +261,24 @@ export async function copiarMesAnterior(sedeId, periodoDestino) {
             es_residente: a.es_residente || false,
             es_rotativo: a.es_rotativo || false,
             estado_color: null, // Reset color when copying to a new month
+            estado: 'activo',
+            fecha_baja: null,
         });
+
+        // Marcarlo como ocupado para evitar enviar duplicados en el bloque de inserción (previene error 409)
+        if (!ocupacionActual[a.consultorio_id]) ocupacionActual[a.consultorio_id] = {};
+        if (!ocupacionActual[a.consultorio_id][a.dia_semana]) ocupacionActual[a.consultorio_id][a.dia_semana] = {};
+        ocupacionActual[a.consultorio_id][a.dia_semana][a.franja] = true;
     }
 
     if (asignacionesAInsertar.length === 0) {
         return 0; // Nada nuevo que copiar
     }
 
-    // Insertar en bloque
+    // Insertar en bloque (usamos upsert para evitar conflictos 409 con registros dados de baja)
     const { error } = await supabase
         .from('alq_asignaciones')
-        .insert(asignacionesAInsertar);
+        .upsert(asignacionesAInsertar, { onConflict: 'consultorio_id,dia_semana,franja,periodo' });
         
     if (error) {
         console.error('Error copiando asignaciones:', error);
