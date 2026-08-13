@@ -197,12 +197,25 @@ function aggregateYoY(data) {
     return Object.values(byMonth).sort((a, b) => a.index - b.index);
 }
 
+function getPreviousMonthRange() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const pad = n => String(n).padStart(2, '0');
+    const fechaDesde = `${firstDay.getFullYear()}-${pad(firstDay.getMonth() + 1)}-01`;
+    const fechaHasta = `${lastDay.getFullYear()}-${pad(lastDay.getMonth() + 1)}-${pad(lastDay.getDate())}`;
+
+    return { fechaDesde, fechaHasta };
+}
+
 export default function MetricasRecordatoriosPanel({ addToast }) {
+    const defaultDates = useMemo(() => getPreviousMonthRange(), []);
     const [rawData, setRawData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [progress, setProgress] = useState('');
-    const [fechaDesde, setFechaDesde] = useState('');
-    const [fechaHasta, setFechaHasta] = useState('');
+    const [fechaDesde, setFechaDesde] = useState(defaultDates.fechaDesde);
+    const [fechaHasta, setFechaHasta] = useState(defaultDates.fechaHasta);
     const [filtroEdad, setFiltroEdad] = useState('todos');
 
     const loadData = useCallback(async () => {
@@ -299,10 +312,18 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                         <option value="65+">65+ años (Tercera Edad)</option>
                     </select>
                 </div>
+                <button onClick={() => {
+                    const prev = getPreviousMonthRange();
+                    setFechaDesde(prev.fechaDesde);
+                    setFechaHasta(prev.fechaHasta);
+                    setFiltroEdad('todos');
+                }} style={{
+                    padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
+                }}>Mes anterior (Por defecto)</button>
                 {(fechaDesde || fechaHasta || filtroEdad !== 'todos') && (
                     <button onClick={() => { setFechaDesde(''); setFechaHasta(''); setFiltroEdad('todos'); }} style={{
                         padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#ef4444', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
-                    }}>Limpiar filtros</button>
+                    }}>Ver todo / Limpiar</button>
                 )}
             </div>
 
