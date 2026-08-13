@@ -289,17 +289,20 @@ export default function MetricsPanel({ addToast }) {
         });
     }, [messages, lines]);
 
-    // Prefijos que NO son médicos reales (se excluyen del ranking)
-    const EXCLUDED_MEDICO_PREFIXES = ['QUIRÓFANOS', 'QUIROFANOS', 'MEDICO GUARDIA', 'BLOQUE'];
+    // Prefijos / Nombres que NO son médicos reales (se excluyen del ranking)
+    const EXCLUDED_MEDICO_PATTERNS = [
+        'QUIRÓFANOS', 'QUIROFANOS', 'MEDICO GUARDIA', 'BLOQUE',
+        'PROFESIONAL CHEQUEO', 'MORALES MALEN', 'GODOY GUZMAN GISEL ALEJANDRA'
+    ];
 
-    // Top médicos (filtrados: sin quirófanos ni guardia)
+    // Top médicos (filtrados: sin quirófanos, guardias ni registros administrativos)
     const topMedicos = useMemo(() => {
         const map = {};
         surgeries.forEach(s => {
             if (!s.medico) return;
-            const upper = s.medico.trim().toUpperCase();
+            const upper = s.medico.trim().toUpperCase().replace(/,/g, '');
             // Excluir entradas que no son médicos
-            if (EXCLUDED_MEDICO_PREFIXES.some(p => upper.startsWith(p))) return;
+            if (EXCLUDED_MEDICO_PATTERNS.some(p => upper.includes(p))) return;
             map[s.medico] = (map[s.medico] || 0) + 1;
         });
         return Object.entries(map)

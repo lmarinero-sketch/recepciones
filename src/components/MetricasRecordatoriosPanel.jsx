@@ -13,6 +13,18 @@ import { fetchRecordatoriosMetrics } from '../services/recordatoriosService';
 const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const COLORS = ['#f59e0b','#3b82f6','#10b981','#8b5cf6','#ec4899','#64748b'];
 
+const isExcludedMedico = (name) => {
+    if (!name) return true;
+    const norm = name.toUpperCase().replace(/,/g, '').trim();
+    return (
+        norm.includes('PROFESIONAL CHEQUEO') ||
+        norm.includes('MORALES MALEN') ||
+        norm.includes('GODOY GUZMAN GISEL ALEJANDRA') ||
+        norm.startsWith('QUIROFANO') ||
+        norm.startsWith('MEDICO GUARDIA')
+    );
+};
+
 function StatCard({ icon: Icon, label, value, sub, color, bg }) {
     return (
         <div style={{
@@ -38,10 +50,18 @@ function StatCard({ icon: Icon, label, value, sub, color, bg }) {
     );
 }
 
-function aggregate(data, fechaDesde, fechaHasta) {
+function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     const byMonth = {};
     const osCounts = {};
     const medicoCounts = {};
+    const ageCounts = {
+        '0 - 17': 0,
+        '18 - 29': 0,
+        '30 - 49': 0,
+        '50 - 64': 0,
+        '65+': 0,
+        'Sin Dato': 0,
+    };
     let totalPresentes = 0, totalAusentes = 0, totalPendientes = 0;
     let filteredCount = 0;
 
@@ -51,6 +71,17 @@ function aggregate(data, fechaDesde, fechaHasta) {
         if (!r.fecha) return;
         if (fechaDesde && r.fecha < fechaDesde) return;
         if (fechaHasta && r.fecha > fechaHasta) return;
+
+        // Filtro por rango etario
+        if (filtroEdad !== 'todos') {
+            const age = r.edad !== null && r.edad !== undefined && r.edad !== '' ? parseInt(r.edad, 10) : null;
+            if (age === null || isNaN(age)) return;
+            if (filtroEdad === '0-17' && age > 17) return;
+            if (filtroEdad === '18-29' && (age < 18 || age > 29)) return;
+            if (filtroEdad === '30-49' && (age < 30 || age > 49)) return;
+            if (filtroEdad === '50-64' && (age < 50 || age > 64)) return;
+            if (filtroEdad === '65+' && age < 65) return;
+        }
 
         const key = `${r.dni || r.paciente}_${r.fecha}`;
         if (!uniqueVisitsMap.has(key)) {
@@ -84,7 +115,25 @@ function aggregate(data, fechaDesde, fechaHasta) {
         const os = r.obra_social || 'Particular/Sin OS';
         osCounts[os] = (osCounts[os] || 0) + 1;
 
-        if (r.medico) medicoCounts[r.medico] = (medicoCounts[r.medico] || 0) + 1;
+        if (r.medico && !isExcludedMedico(r.medico)) {
+            medicoCounts[r.medico] = (medicoCounts[r.medico] || 0) + 1;
+        }
+
+        // Conteo por rango etario
+        if (r.edad !== null && r.edad !== undefined && r.edad !== '') {
+            const age = parseInt(r.edad, 10);
+            if (!isNaN(age)) {
+                if (age <= 17) ageCounts['0 - 17']++;
+                else if (age <= 29) ageCounts['18 - 29']++;
+                else if (age <= 49) ageCounts['30 - 49']++;
+                else if (age <= 64) ageCounts['50 - 64']++;
+                else ageCounts['65+']++;
+            } else {
+                ageCounts['Sin Dato']++;
+            }
+        } else {
+            ageCounts['Sin Dato']++;
+        }
     });
 
     const months = Object.keys(byMonth).sort().map((m, idx, arr) => {
@@ -103,12 +152,25 @@ function aggregate(data, fechaDesde, fechaHasta) {
     const othersOS = Object.entries(osCounts).sort((a, b) => b[1] - a[1]).slice(5).reduce((s, [, c]) => s + c, 0);
     if (othersOS > 0) topOS.push({ name: 'Otras', value: othersOS });
 
-    const topMedicos = Object.entries(medicoCounts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value]) => ({ name, value }));
+    const topMedicos = Object.entries(medicoCounts).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
+
+    const AGE_COLORS = {
+        '0 - 17': '#3b82f6',
+        '18 - 29': '#10b981',
+        '30 - 49': '#f59e0b',
+        '50 - 64': '#8b5cf6',
+        '65+': '#ec4899',
+        'Sin Dato': '#cbd5e1',
+    };
+
+    const ageDistribution = Object.entries(ageCounts)
+        .filter(([, value]) => value > 0)
+        .map(([name, value]) => ({ name, value, color: AGE_COLORS[name] || '#64748b' }));
 
     const tasaGlobal = (totalPresentes + totalAusentes) > 0
         ? Math.round((totalPresentes / (totalPresentes + totalAusentes)) * 100) : 0;
 
-    return { months, topOS, topMedicos, totalPresentes, totalAusentes, totalPendientes, total: filteredCount, tasaGlobal };
+    return { months, topOS, topMedicos, ageDistribution, totalPresentes, totalAusentes, totalPendientes, total: filteredCount, tasaGlobal };
 }
 
 function aggregateYoY(data) {
@@ -141,6 +203,7 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
     const [progress, setProgress] = useState('');
     const [fechaDesde, setFechaDesde] = useState('');
     const [fechaHasta, setFechaHasta] = useState('');
+    const [filtroEdad, setFiltroEdad] = useState('todos');
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -165,7 +228,7 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
         return [...ys].sort().reverse();
     }, [rawData]);
 
-    const agg = useMemo(() => aggregate(rawData, fechaDesde, fechaHasta), [rawData, fechaDesde, fechaHasta]);
+    const agg = useMemo(() => aggregate(rawData, fechaDesde, fechaHasta, filtroEdad), [rawData, fechaDesde, fechaHasta, filtroEdad]);
     const yoyData = useMemo(() => aggregateYoY(rawData), [rawData]); // YoY siempre analiza toda la historia
     
     const avgAgendados = useMemo(() => {
@@ -204,7 +267,7 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                 }}><RefreshCw size={14} /> Actualizar</button>
             </div>
 
-            {/* Date Filters */}
+            {/* Date & Age Filters */}
             <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Desde:</span>
@@ -218,8 +281,26 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                         padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#1e293b', fontSize: '0.8rem', background: '#fff'
                     }} />
                 </div>
-                {(fechaDesde || fechaHasta) && (
-                    <button onClick={() => { setFechaDesde(''); setFechaHasta(''); }} style={{
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Rango Etario:</span>
+                    <select
+                        value={filtroEdad}
+                        onChange={e => setFiltroEdad(e.target.value)}
+                        style={{
+                            padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0',
+                            color: '#1e293b', fontSize: '0.8rem', background: '#fff', fontWeight: 600, cursor: 'pointer'
+                        }}
+                    >
+                        <option value="todos">Todos los grupos etarios</option>
+                        <option value="0-17">0 - 17 años (Pediatría / Adolescentes)</option>
+                        <option value="18-29">18 - 29 años (Jóvenes)</option>
+                        <option value="30-49">30 - 49 años (Adultos)</option>
+                        <option value="50-64">50 - 64 años (Adultos Mayores)</option>
+                        <option value="65+">65+ años (Tercera Edad)</option>
+                    </select>
+                </div>
+                {(fechaDesde || fechaHasta || filtroEdad !== 'todos') && (
+                    <button onClick={() => { setFechaDesde(''); setFechaHasta(''); setFiltroEdad('todos'); }} style={{
                         padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#ef4444', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
                     }}>Limpiar filtros</button>
                 )}
@@ -338,15 +419,56 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                         )}
                     </div>
 
+                {/* Row: Distribución Etaria + Obra Social */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    {/* Rangos Etarios Pie */}
+                    <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+                        <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Users size={18} color="#ec4899" /> Distribución por Rangos Etarios
+                        </h3>
+                        <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 16px 0' }}>
+                            Clasificación por edades de pacientes que agendaron chequeos.
+                        </p>
+                        {agg.ageDistribution.length > 0 ? (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
+                                <div style={{ position: 'relative', height: '180px', flexShrink: 0 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={agg.ageDistribution} cx="50%" cy="50%" innerRadius={55} outerRadius={78} paddingAngle={3} dataKey="value" stroke="none">
+                                                {agg.ageDistribution.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                                            </Pie>
+                                            <Tooltip formatter={v => [`${v} turnos`, 'Pacientes']} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e293b' }}>{agg.total}</div>
+                                        <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>TURNO(S)</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', overflowY: 'auto' }}>
+                                    {agg.ageDistribution.map((item, i) => (
+                                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', background: '#f8fafc', padding: '6px 10px', borderRadius: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ width: 10, height: 10, borderRadius: 3, background: item.color, flexShrink: 0 }} />
+                                                <span style={{ color: '#475569', fontWeight: 600 }}>{item.name}</span>
+                                            </div>
+                                            <span style={{ fontWeight: 800, color: '#1e293b' }}>{item.value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos de edad</div>}
+                    </div>
+
                     {/* Obra Social Pie */}
-                    <div style={{ flex: 1, background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px', display: 'flex', flexDirection: 'column' }}>
                         <h3 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>Top Obras Sociales</h3>
                         {agg.topOS.length > 0 ? (
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
                                 <div style={{ position: 'relative', height: '180px', flexShrink: 0 }}>
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
-                                            <Pie data={agg.topOS} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2} dataKey="value" stroke="none">
+                                            <Pie data={agg.topOS} cx="50%" cy="50%" innerRadius={55} outerRadius={78} paddingAngle={2} dataKey="value" stroke="none">
                                                 {agg.topOS.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                                             </Pie>
                                             <Tooltip formatter={v => [`${v} turnos`, 'Cantidad']} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
@@ -372,23 +494,26 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                         ) : <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos</div>}
                     </div>
                 </div>
+                </div>
 
                 {/* Top Médicos */}
                 {agg.topMedicos.length > 0 && (
                     <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
                         <h3 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Building2 size={18} color="#8b5cf6" /> Top Médicos por Turnos
+                            <Building2 size={18} color="#8b5cf6" /> Médicos / Responsables por Turnos ({agg.topMedicos.length})
                         </h3>
-                        <div style={{ height: 220 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={agg.topMedicos} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                                    <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} width={150} axisLine={false} tickLine={false} />
-                                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={v => [`${v} turnos`]} />
-                                    <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} maxBarSize={24} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                        <div style={{ maxHeight: '450px', overflowY: 'auto', paddingRight: '6px' }}>
+                            <div style={{ height: Math.max(220, agg.topMedicos.length * 36) }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={agg.topMedicos} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                        <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} width={180} axisLine={false} tickLine={false} />
+                                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={v => [`${v} turnos`]} />
+                                        <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} maxBarSize={24} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
                     </div>
                 )}
