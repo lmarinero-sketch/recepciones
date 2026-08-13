@@ -110,26 +110,29 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
         else if (isAusente) byMonth[month].ausentes++;
         else byMonth[month].pendientes++;
 
-        const os = r.obra_social || 'Particular/Sin OS';
-        osCounts[os] = (osCounts[os] || 0) + 1;
+        // Contar Obras Sociales, Médicos y Rangos Etarios SOLAMENTE para turnos con Asistencia === 'Presente'
+        if (asis === 'Presente') {
+            const os = r.obra_social || 'Particular/Sin OS';
+            osCounts[os] = (osCounts[os] || 0) + 1;
 
-        if (r.medico && !isExcludedMedico(r.medico)) {
-            medicoCounts[r.medico] = (medicoCounts[r.medico] || 0) + 1;
-        }
+            if (r.medico && !isExcludedMedico(r.medico)) {
+                medicoCounts[r.medico] = (medicoCounts[r.medico] || 0) + 1;
+            }
 
-        // Conteo por rango etario (Excluyendo menores de 14 años por especificación médica)
-        if (r.edad !== null && r.edad !== undefined && r.edad !== '') {
-            const age = parseInt(r.edad, 10);
-            if (!isNaN(age)) {
-                if (age >= 14 && age <= 18) ageCounts['14 - 18']++;
-                else if (age >= 19 && age <= 50) ageCounts['19 - 50']++;
-                else if (age >= 51 && age <= 65) ageCounts['51 - 65']++;
-                else if (age >= 66) ageCounts['66+']++;
+            // Conteo por rango etario (Solo pacientes con Asistencia Presente, excluyendo menores de 14 años por especificación médica)
+            if (r.edad !== null && r.edad !== undefined && r.edad !== '') {
+                const age = parseInt(r.edad, 10);
+                if (!isNaN(age)) {
+                    if (age >= 14 && age <= 18) ageCounts['14 - 18']++;
+                    else if (age >= 19 && age <= 50) ageCounts['19 - 50']++;
+                    else if (age >= 51 && age <= 65) ageCounts['51 - 65']++;
+                    else if (age >= 66) ageCounts['66+']++;
+                } else {
+                    ageCounts['Sin Dato']++;
+                }
             } else {
                 ageCounts['Sin Dato']++;
             }
-        } else {
-            ageCounts['Sin Dato']++;
         }
     });
 
@@ -443,7 +446,7 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                             <Users size={18} color="#ec4899" /> Distribución por Rangos Etarios
                         </h3>
                         <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 16px 0' }}>
-                            Clasificación por edades de pacientes que agendaron chequeos.
+                            Clasificación por edades de pacientes con asistencia presente.
                         </p>
                         {agg.ageDistribution.length > 0 ? (
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
@@ -453,12 +456,12 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                                             <Pie data={agg.ageDistribution} cx="50%" cy="50%" innerRadius={55} outerRadius={78} paddingAngle={3} dataKey="value" stroke="none">
                                                 {agg.ageDistribution.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                                             </Pie>
-                                            <Tooltip formatter={v => [`${v} turnos`, 'Pacientes']} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                                            <Tooltip formatter={v => [`${v} turnos`, 'Presentes']} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                                         </PieChart>
                                     </ResponsiveContainer>
                                     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e293b' }}>{agg.total}</div>
-                                        <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>TURNO(S)</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981' }}>{agg.totalPresentes}</div>
+                                        <div style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 700 }}>PRESENTES</div>
                                     </div>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', overflowY: 'auto' }}>
@@ -491,8 +494,8 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                                         </PieChart>
                                     </ResponsiveContainer>
                                     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e293b' }}>{agg.total}</div>
-                                        <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>TOTAL</div>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981' }}>{agg.totalPresentes}</div>
+                                        <div style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 700 }}>PRESENTES</div>
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto' }}>
