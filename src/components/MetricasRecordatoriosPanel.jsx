@@ -55,7 +55,6 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     const osCounts = {};
     const medicoCounts = {};
     const ageCounts = {
-        '< 14': 0,
         '14 - 18': 0,
         '19 - 50': 0,
         '51 - 65': 0,
@@ -76,7 +75,6 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
         if (filtroEdad !== 'todos') {
             const age = r.edad !== null && r.edad !== undefined && r.edad !== '' ? parseInt(r.edad, 10) : null;
             if (age === null || isNaN(age)) return;
-            if (filtroEdad === '<14' && age >= 14) return;
             if (filtroEdad === '14-18' && (age < 14 || age > 18)) return;
             if (filtroEdad === '19-50' && (age < 19 || age > 50)) return;
             if (filtroEdad === '51-65' && (age < 51 || age > 65)) return;
@@ -119,15 +117,14 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
             medicoCounts[r.medico] = (medicoCounts[r.medico] || 0) + 1;
         }
 
-        // Conteo por rango etario
+        // Conteo por rango etario (Excluyendo menores de 14 años por especificación médica)
         if (r.edad !== null && r.edad !== undefined && r.edad !== '') {
             const age = parseInt(r.edad, 10);
             if (!isNaN(age)) {
-                if (age < 14) ageCounts['< 14']++;
-                else if (age <= 18) ageCounts['14 - 18']++;
-                else if (age <= 50) ageCounts['19 - 50']++;
-                else if (age <= 65) ageCounts['51 - 65']++;
-                else ageCounts['66+']++;
+                if (age >= 14 && age <= 18) ageCounts['14 - 18']++;
+                else if (age >= 19 && age <= 50) ageCounts['19 - 50']++;
+                else if (age >= 51 && age <= 65) ageCounts['51 - 65']++;
+                else if (age >= 66) ageCounts['66+']++;
             } else {
                 ageCounts['Sin Dato']++;
             }
@@ -155,7 +152,6 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     const topMedicos = Object.entries(medicoCounts).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
 
     const AGE_COLORS = {
-        '< 14': '#38bdf8',
         '14 - 18': '#3b82f6',
         '19 - 50': '#10b981',
         '51 - 65': '#f59e0b',
@@ -304,12 +300,11 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                             color: '#1e293b', fontSize: '0.8rem', background: '#fff', fontWeight: 600, cursor: 'pointer'
                         }}
                     >
-                        <option value="todos">Todos los grupos etarios</option>
-                        <option value="<14">&lt; 14 años (Pediatría)</option>
-                        <option value="14-18">14 - 18 años (Adolescentes)</option>
-                        <option value="19-50">19 - 50 años (Adultos Jóvenes)</option>
-                        <option value="51-65">51 - 65 años (Adultos)</option>
-                        <option value="66+">66+ años (66 en adelante)</option>
+                        <option value="todos">Todos los rangos (≥ 14 años)</option>
+                        <option value="14-18">14 - 18 años</option>
+                        <option value="19-50">19 - 50 años</option>
+                        <option value="51-65">51 - 65 años</option>
+                        <option value="66+">66 en adelante (66+ años)</option>
                     </select>
                 </div>
                 <button onClick={() => {
