@@ -55,11 +55,11 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     const osCounts = {};
     const medicoCounts = {};
     const ageCounts = {
-        '0 - 17': 0,
-        '18 - 29': 0,
-        '30 - 49': 0,
-        '50 - 64': 0,
-        '65+': 0,
+        '< 14': 0,
+        '14 - 18': 0,
+        '19 - 50': 0,
+        '51 - 65': 0,
+        '66+': 0,
         'Sin Dato': 0,
     };
     let totalPresentes = 0, totalAusentes = 0, totalPendientes = 0;
@@ -76,11 +76,11 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
         if (filtroEdad !== 'todos') {
             const age = r.edad !== null && r.edad !== undefined && r.edad !== '' ? parseInt(r.edad, 10) : null;
             if (age === null || isNaN(age)) return;
-            if (filtroEdad === '0-17' && age > 17) return;
-            if (filtroEdad === '18-29' && (age < 18 || age > 29)) return;
-            if (filtroEdad === '30-49' && (age < 30 || age > 49)) return;
-            if (filtroEdad === '50-64' && (age < 50 || age > 64)) return;
-            if (filtroEdad === '65+' && age < 65) return;
+            if (filtroEdad === '<14' && age >= 14) return;
+            if (filtroEdad === '14-18' && (age < 14 || age > 18)) return;
+            if (filtroEdad === '19-50' && (age < 19 || age > 50)) return;
+            if (filtroEdad === '51-65' && (age < 51 || age > 65)) return;
+            if (filtroEdad === '66+' && age < 66) return;
         }
 
         const key = `${r.dni || r.paciente}_${r.fecha}`;
@@ -123,11 +123,11 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
         if (r.edad !== null && r.edad !== undefined && r.edad !== '') {
             const age = parseInt(r.edad, 10);
             if (!isNaN(age)) {
-                if (age <= 17) ageCounts['0 - 17']++;
-                else if (age <= 29) ageCounts['18 - 29']++;
-                else if (age <= 49) ageCounts['30 - 49']++;
-                else if (age <= 64) ageCounts['50 - 64']++;
-                else ageCounts['65+']++;
+                if (age < 14) ageCounts['< 14']++;
+                else if (age <= 18) ageCounts['14 - 18']++;
+                else if (age <= 50) ageCounts['19 - 50']++;
+                else if (age <= 65) ageCounts['51 - 65']++;
+                else ageCounts['66+']++;
             } else {
                 ageCounts['Sin Dato']++;
             }
@@ -155,11 +155,11 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     const topMedicos = Object.entries(medicoCounts).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
 
     const AGE_COLORS = {
-        '0 - 17': '#3b82f6',
-        '18 - 29': '#10b981',
-        '30 - 49': '#f59e0b',
-        '50 - 64': '#8b5cf6',
-        '65+': '#ec4899',
+        '< 14': '#38bdf8',
+        '14 - 18': '#3b82f6',
+        '19 - 50': '#10b981',
+        '51 - 65': '#f59e0b',
+        '66+': '#8b5cf6',
         'Sin Dato': '#cbd5e1',
     };
 
@@ -305,11 +305,11 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                         }}
                     >
                         <option value="todos">Todos los grupos etarios</option>
-                        <option value="0-17">0 - 17 años (Pediatría / Adolescentes)</option>
-                        <option value="18-29">18 - 29 años (Jóvenes)</option>
-                        <option value="30-49">30 - 49 años (Adultos)</option>
-                        <option value="50-64">50 - 64 años (Adultos Mayores)</option>
-                        <option value="65+">65+ años (Tercera Edad)</option>
+                        <option value="<14">&lt; 14 años (Pediatría)</option>
+                        <option value="14-18">14 - 18 años (Adolescentes)</option>
+                        <option value="19-50">19 - 50 años (Adultos Jóvenes)</option>
+                        <option value="51-65">51 - 65 años (Adultos)</option>
+                        <option value="66+">66+ años (66 en adelante)</option>
                     </select>
                 </div>
                 <button onClick={() => {
