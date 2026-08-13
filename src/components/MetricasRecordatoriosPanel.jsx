@@ -55,8 +55,8 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     const osCounts = {};
     const medicoCounts = {};
     const ageCounts = {
-        '14 - 18': 0,
-        '19 - 50': 0,
+        '14 - 17': 0,
+        '18 - 50': 0,
         '51 - 65': 0,
         '66+': 0,
         'Sin Dato': 0,
@@ -75,8 +75,8 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
         if (filtroEdad !== 'todos') {
             const age = r.edad !== null && r.edad !== undefined && r.edad !== '' ? parseInt(r.edad, 10) : null;
             if (age === null || isNaN(age)) return;
-            if (filtroEdad === '14-18' && (age < 14 || age > 18)) return;
-            if (filtroEdad === '19-50' && (age < 19 || age > 50)) return;
+            if (filtroEdad === '14-17' && (age < 14 || age > 17)) return;
+            if (filtroEdad === '18-50' && (age < 18 || age > 50)) return;
             if (filtroEdad === '51-65' && (age < 51 || age > 65)) return;
             if (filtroEdad === '66+' && age < 66) return;
         }
@@ -123,8 +123,8 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
             if (r.edad !== null && r.edad !== undefined && r.edad !== '') {
                 const age = parseInt(r.edad, 10);
                 if (!isNaN(age)) {
-                    if (age >= 14 && age <= 18) ageCounts['14 - 18']++;
-                    else if (age >= 19 && age <= 50) ageCounts['19 - 50']++;
+                    if (age >= 14 && age <= 17) ageCounts['14 - 17']++;
+                    else if (age >= 18 && age <= 50) ageCounts['18 - 50']++;
                     else if (age >= 51 && age <= 65) ageCounts['51 - 65']++;
                     else if (age >= 66) ageCounts['66+']++;
                 } else {
@@ -155,8 +155,8 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     const topMedicos = Object.entries(medicoCounts).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
 
     const AGE_COLORS = {
-        '14 - 18': '#3b82f6',
-        '19 - 50': '#10b981',
+        '14 - 17': '#3b82f6',
+        '18 - 50': '#10b981',
         '51 - 65': '#f59e0b',
         '66+': '#8b5cf6',
         'Sin Dato': '#cbd5e1',
@@ -318,9 +318,9 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                         }}
                     >
                         <option value="todos">Todos los rangos (≥ 14 años)</option>
-                        <option value="14-18">14 - 18 años</option>
-                        <option value="19-50">19 - 50 años</option>
-                        <option value="51-65">51 - 65 años</option>
+                        <option value="14-17">14 - 17 años (Adolescentes)</option>
+                        <option value="18-50">18 - 50 años (Adultos Jóvenes)</option>
+                        <option value="51-65">51 - 65 años (Adultos)</option>
                         <option value="66+">66 en adelante (66+ años)</option>
                     </select>
                 </div>
