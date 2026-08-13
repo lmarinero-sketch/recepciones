@@ -172,7 +172,7 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     return { months, topOS, topMedicos, ageDistribution, totalPresentes, totalAusentes, totalPendientes, total: filteredCount, tasaGlobal };
 }
 
-function aggregateYoY(data) {
+function aggregateYoY(data, modo = 'agendados') {
     const byMonth = {};
     const uniqueVisitsMap = new Map();
     
@@ -182,15 +182,28 @@ function aggregateYoY(data) {
         const key = `${r.dni || r.paciente}_${r.fecha}`;
         if (!uniqueVisitsMap.has(key)) {
             uniqueVisitsMap.set(key, { ...r });
+        } else {
+            const existing = uniqueVisitsMap.get(key);
+            if (r.asistencia_efectiva === 'Presente') {
+                existing.asistencia_efectiva = 'Presente';
+            }
         }
     });
 
-    // Agrupamos por mes y año
+    // Agrupamos por mes y año según el modo seleccionado
     Array.from(uniqueVisitsMap.values()).forEach(r => {
+        const asis = r.asistencia_efectiva;
+        const isAusente = asis === 'Ausente' || asis === 'Ausencia justificada' || asis === 'Ausencia injustificada' || asis === 'Anulación Cita Online';
+
+        if (modo === 'asistidos' && asis !== 'Presente') return;
+        if (modo === 'ausentes' && !isAusente) return;
+
         const [y, mo] = r.fecha.split('-');
         const monthIndex = parseInt(mo, 10) - 1;
+        if (monthIndex < 0 || monthIndex > 11) return;
+
         if (!byMonth[monthIndex]) byMonth[monthIndex] = { name: MONTH_NAMES[monthIndex], index: monthIndex };
-        byMonth[monthIndex][y] = (byMonth[monthIndex][y] || 0) + 1; // Contamos Agendados (Total de turnos)
+        byMonth[monthIndex][y] = (byMonth[monthIndex][y] || 0) + 1;
     });
     
     return Object.values(byMonth).sort((a, b) => a.index - b.index);
@@ -216,6 +229,7 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
     const [fechaDesde, setFechaDesde] = useState(defaultDates.fechaDesde);
     const [fechaHasta, setFechaHasta] = useState(defaultDates.fechaHasta);
     const [filtroEdad, setFiltroEdad] = useState('todos');
+    const [yoyMode, setYoyMode] = useState('agendados'); // agendados | asistidos | ausentes
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -241,7 +255,7 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
     }, [rawData]);
 
     const agg = useMemo(() => aggregate(rawData, fechaDesde, fechaHasta, filtroEdad), [rawData, fechaDesde, fechaHasta, filtroEdad]);
-    const yoyData = useMemo(() => aggregateYoY(rawData), [rawData]); // YoY siempre analiza toda la historia
+    const yoyData = useMemo(() => aggregateYoY(rawData, yoyMode), [rawData, yoyMode]); // YoY con filtro por estado
     
     const avgAgendados = useMemo(() => {
         return agg.months.length > 0 ? Math.round(agg.total / agg.months.length) : 0;
@@ -373,12 +387,61 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
 
                 {/* Comparativa Interanual YoY */}
                 <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
-                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <TrendingUp size={18} color="#3b82f6" /> Comparativa Interanual (Volumen de Turnos Agendados)
-                    </h3>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 16px 0', maxWidth: '600px' }}>
-                        Analiza cómo venimos performando comparando el total de turnos mes a mes entre los diferentes años. (Este gráfico siempre evalúa toda la historia disponible, ignorando el filtro).
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <TrendingUp size={18} color={yoyMode === 'asistidos' ? '#10b981' : yoyMode === 'ausentes' ? '#ef4444' : '#3b82f6'} />
+                                Comparativa Interanual ({yoyMode === 'asistidos' ? 'Turnos Asistidos / Presentes' : yoyMode === 'ausentes' ? 'Turnos Ausentes' : 'Volumen de Turnos Agendados'})
+                            </h3>
+                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0 0', maxWidth: '550px' }}>
+                                {yoyMode === 'asistidos'
+                                    ? 'Analiza la cantidad de pacientes que asistieron de manera efectiva (Presentes) mes a mes entre los diferentes años.'
+                                    : yoyMode === 'ausentes'
+                                    ? 'Analiza la cantidad de inasistencias o ausencias registradas mes a mes entre los diferentes años.'
+                                    : 'Analiza el volumen total de turnos agendados mes a mes entre los diferentes años.'}
+                            </p>
+                        </div>
+
+                        {/* Botones de Selección */}
+                        <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                            <button
+                                onClick={() => setYoyMode('agendados')}
+                                style={{
+                                    padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                                    fontSize: '0.78rem', fontWeight: 700, transition: 'all .15s',
+                                    background: yoyMode === 'agendados' ? '#3b82f6' : 'transparent',
+                                    color: yoyMode === 'agendados' ? '#fff' : '#64748b',
+                                    boxShadow: yoyMode === 'agendados' ? '0 2px 6px rgba(59,130,246,.3)' : 'none',
+                                }}
+                            >
+                                Turnos Agendados
+                            </button>
+                            <button
+                                onClick={() => setYoyMode('asistidos')}
+                                style={{
+                                    padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                                    fontSize: '0.78rem', fontWeight: 700, transition: 'all .15s',
+                                    background: yoyMode === 'asistidos' ? '#10b981' : 'transparent',
+                                    color: yoyMode === 'asistidos' ? '#fff' : '#64748b',
+                                    boxShadow: yoyMode === 'asistidos' ? '0 2px 6px rgba(16,185,129,.3)' : 'none',
+                                }}
+                            >
+                                Turnos Asistidos
+                            </button>
+                            <button
+                                onClick={() => setYoyMode('ausentes')}
+                                style={{
+                                    padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                                    fontSize: '0.78rem', fontWeight: 700, transition: 'all .15s',
+                                    background: yoyMode === 'ausentes' ? '#ef4444' : 'transparent',
+                                    color: yoyMode === 'ausentes' ? '#fff' : '#64748b',
+                                    boxShadow: yoyMode === 'ausentes' ? '0 2px 6px rgba(239,68,68,.3)' : 'none',
+                                }}
+                            >
+                                Turnos Ausentes
+                            </button>
+                        </div>
+                    </div>
                     {yoyData.length > 0 ? (
                         <div style={{ height: 300 }}>
                             <ResponsiveContainer width="100%" height="100%">
