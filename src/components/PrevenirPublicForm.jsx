@@ -834,11 +834,8 @@ export default function PrevenirPublicForm() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Send size={16} color={autoSendWhatsapp ? '#059669' : '#94a3b8'} />
                         <div>
-                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: autoSendWhatsapp ? '#065f46' : '#475569' }}>
-                                Enviar WhatsApp oficial automático
-                            </div>
-                            <div style={{ fontSize: '0.7rem', color: autoSendWhatsapp ? '#047857' : '#64748b' }}>
-                                Plantilla Meta: bienvenida_programa_prevenir (vía BuilderBot)
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: autoSendWhatsapp ? '#065f46' : '#475569' }}>
+                                Enviar WhatsApp automático
                             </div>
                         </div>
                     </div>
