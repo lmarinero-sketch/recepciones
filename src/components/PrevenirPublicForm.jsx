@@ -894,7 +894,7 @@ export default function PrevenirPublicForm() {
                     ) : (
                         <>
                             <Check size={20} />
-                            <span>Registrar Paciente {autoSendWhatsapp && '(+ WhatsApp)'}</span>
+                            <span>Registrar Paciente</span>
                         </>
                     )}
                 </button>
