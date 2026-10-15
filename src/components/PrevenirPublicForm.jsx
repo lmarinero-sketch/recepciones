@@ -1100,7 +1100,7 @@ export default function PrevenirPublicForm() {
                             marginBottom: '16px'
                         }}>
                             <img
-                                src="/animacion%20final.gif"
+                                src="/animacion_final.gif"
                                 alt="Registro completado"
                                 style={{
                                     width: '100%',
