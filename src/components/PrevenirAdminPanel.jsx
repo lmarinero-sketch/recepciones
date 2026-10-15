@@ -12,6 +12,8 @@ import {
     updatePrevenirLead,
     formatPhoneDisplay
 } from '../services/prevenirService';
+import { normalizeArgentinePhone } from '../services/builderbotApi';
+import ChatWindow from './ChatWindow';
 
 export default function PrevenirAdminPanel({ addToast, onViewChange }) {
     const [leads, setLeads] = useState([]);
@@ -22,6 +24,8 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
     const [copiedLink, setCopiedLink] = useState(false);
     const [showQrModal, setShowQrModal] = useState(false);
     const [sendingId, setSendingId] = useState(null);
+    const [chatOpen, setChatOpen] = useState(false);
+    const [chatLead, setChatLead] = useState(null);
 
     // Obtener la URL pública para compartir
     const publicUrl = useMemo(() => {
@@ -70,6 +74,17 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
         setCopiedLink(true);
         addToast?.('Link público copiado al portapapeles', 'success');
         setTimeout(() => setCopiedLink(false), 2500);
+    };
+
+    // Abrir ventana de chat / plantillas para el prospecto
+    const handleOpenChat = (lead) => {
+        const phone = lead.telefono_wa || lead.telefono;
+        if (!phone) {
+            addToast?.('Este paciente no tiene teléfono registrado', 'error');
+            return;
+        }
+        setChatLead(lead);
+        setChatOpen(true);
     };
 
     // Reenviar o enviar WhatsApp
@@ -384,7 +399,17 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                                     const fechaFmt = new Date(lead.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
                                     const horaFmt = new Date(lead.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
                                     return (
-                                        <tr key={lead.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}>
+                                        <tr
+                                            key={lead.id}
+                                            onClick={() => handleOpenChat(lead)}
+                                            style={{
+                                                borderBottom: '1px solid #f1f5f9',
+                                                cursor: 'pointer',
+                                                transition: 'background 0.15s'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                        >
                                             {/* Paciente */}
                                             <td style={{ padding: '12px 16px' }}>
                                                 <div style={{ fontWeight: 700, color: '#0f172a' }}>
@@ -500,11 +525,42 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                                             {/* Acciones */}
                                             <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                                                 <div style={{ display: 'inline-flex', gap: '6px' }}>
-                                                    {/* Enviar / Reenviar WhatsApp */}
+                                                    {/* Abrir Chat con Plantillas */}
                                                     <button
-                                                        onClick={() => handleSendWhatsApp(lead)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenChat(lead);
+                                                        }}
+                                                        title="Abrir chat y continuar con plantillas Meta"
+                                                        style={{
+                                                            padding: '6px 11px',
+                                                            borderRadius: '6px',
+                                                            border: '1px solid #bfdbfe',
+                                                            background: '#eff6ff',
+                                                            color: '#1d4ed8',
+                                                            cursor: 'pointer',
+                                                            fontSize: '0.74rem',
+                                                            fontWeight: 700,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '5px',
+                                                            transition: 'all 0.15s ease'
+                                                        }}
+                                                        onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; }}
+                                                        onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; }}
+                                                    >
+                                                        <MessageSquare size={13} color="#1d4ed8" />
+                                                        <span>Chat / Plantillas</span>
+                                                    </button>
+
+                                                    {/* Enviar / Reenviar WhatsApp de bienvenida */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleSendWhatsApp(lead);
+                                                        }}
                                                         disabled={sendingId === lead.id}
-                                                        title="Enviar WhatsApp de bienvenida"
+                                                        title="Reenviar WhatsApp de bienvenida"
                                                         style={{
                                                             padding: '6px 10px',
                                                             borderRadius: '6px',
@@ -525,7 +581,10 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
 
                                                     {/* Eliminar */}
                                                     <button
-                                                        onClick={() => handleDelete(lead.id, lead.nombre_completo)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDelete(lead.id, lead.nombre_completo);
+                                                        }}
                                                         title="Eliminar registro"
                                                         style={{
                                                             padding: '6px',
@@ -617,6 +676,31 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* ChatWindow con soporte completo de Plantillas Meta y chat libre */}
+            {chatOpen && chatLead && (
+                <ChatWindow
+                    open={chatOpen}
+                    onClose={() => {
+                        setChatOpen(false);
+                        setChatLead(null);
+                        loadData();
+                    }}
+                    patientName={chatLead.nombre_completo}
+                    patientPhone={normalizeArgentinePhone(chatLead.telefono_wa || chatLead.telefono)}
+                    patientContext={{
+                        dni: chatLead.dni,
+                        idPaciente: chatLead.id,
+                        obraSocial: chatLead.obra_social,
+                        edad: chatLead.edad,
+                        interes: chatLead.tipo_chequeo,
+                        origen: 'Programa Prevenir',
+                    }}
+                    addToast={addToast}
+                    defaultLineLabel="Recepciones Prevenir"
+                    autoShowTemplates={true}
+                />
             )}
         </div>
     );
