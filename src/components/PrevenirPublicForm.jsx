@@ -256,20 +256,6 @@ export default function PrevenirPublicForm() {
                         <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.2px' }}>
                             Sanatorio Argentino
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{
-                                fontSize: '0.68rem',
-                                fontWeight: 700,
-                                background: '#eff6ff',
-                                color: '#1d4ed8',
-                                padding: '2px 7px',
-                                borderRadius: '6px',
-                                border: '1px solid #bfdbfe'
-                            }}>
-                                Programa Prevenir
-                            </span>
-                            <span style={{ fontSize: '0.68rem', color: '#64748b' }}>• OSP</span>
-                        </div>
                     </div>
                 </div>
 
