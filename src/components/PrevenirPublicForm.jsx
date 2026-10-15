@@ -307,40 +307,7 @@ export default function PrevenirPublicForm() {
                 </button>
             </div>
 
-            {/* Banner Campaña */}
-            <div style={{
-                width: '100%',
-                maxWidth: '480px',
-                background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
-                color: '#ffffff',
-                borderRadius: '14px',
-                padding: '12px 16px',
-                marginBottom: '14px',
-                boxShadow: '0 4px 14px rgba(29, 78, 216, 0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-            }}>
-                <div>
-                    <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.85, fontWeight: 700 }}>
-                        Stand Obra Social Provincia
-                    </div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 800, marginTop: '1px' }}>
-                        Captación de Chequeos
-                    </div>
-                </div>
-                <div style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '50%',
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }}>
-                    <Heart size={20} color="#fff" />
-                </div>
-            </div>
+
 
             {/* Notificaciones */}
             {successMessage && (
