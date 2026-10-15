@@ -2,8 +2,19 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Heart, ShieldCheck, Search, Filter, RefreshCw, Send, Phone,
     Calendar, Users, Download, Copy, Check, QrCode, ExternalLink,
-    Trash2, MessageSquare, AlertCircle, Sparkles, CheckCircle2, ChevronDown
+    Trash2, MessageSquare, AlertCircle, Sparkles, CheckCircle2, ChevronDown,
+    TrendingUp, BarChart2, Activity, CalendarRange
 } from 'lucide-react';
+import {
+    ResponsiveContainer,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    Tooltip,
+    CartesianGrid,
+    Cell
+} from 'recharts';
 import * as XLSX from 'xlsx';
 import {
     fetchPrevenirLeads,
@@ -15,11 +26,60 @@ import {
 import { normalizeArgentinePhone } from '../services/builderbotApi';
 import ChatWindow from './ChatWindow';
 
+// Tooltip médico estilizado para el gráfico de barras diario
+const CustomChartTooltip = ({ active, payload }) => {
+    if (!active || !payload || !payload.length) return null;
+    const data = payload[0]?.payload;
+    if (!data) return null;
+
+    return (
+        <div style={{
+            background: '#ffffff',
+            borderRadius: '10px',
+            border: '1px solid #cbd5e1',
+            boxShadow: '0 8px 20px -4px rgba(15, 23, 42, 0.12)',
+            padding: '10px 14px',
+            fontSize: '0.8rem',
+            minWidth: '180px'
+        }}>
+            <div style={{
+                fontWeight: 700,
+                color: '#0f172a',
+                marginBottom: '6px',
+                borderBottom: '1px solid #f1f5f9',
+                paddingBottom: '4px'
+            }}>
+                {data.fullDate || data.label}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ color: '#64748b', fontWeight: 600 }}>Total captados:</span>
+                <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>{data.total}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', marginBottom: '3px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#db2777', fontWeight: 600 }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#db2777', display: 'inline-block' }}></span>
+                    Prevenir:
+                </span>
+                <span style={{ fontWeight: 700, color: '#db2777' }}>{data.prevenir}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#2563eb', fontWeight: 600 }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb', display: 'inline-block' }}></span>
+                    Chequeo Anual:
+                </span>
+                <span style={{ fontWeight: 700, color: '#2563eb' }}>{data.chequeoAnual}</span>
+            </div>
+        </div>
+    );
+};
+
 export default function PrevenirAdminPanel({ addToast, onViewChange }) {
     const [leads, setLeads] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [filterDate, setFilterDate] = useState('all'); // 'today' | 'all'
+    const [selectedPeriod, setSelectedPeriod] = useState('7d'); // '7d' | '14d' | '30d' | 'month' | 'all' | 'custom'
+    const [customStartDate, setCustomStartDate] = useState('');
+    const [customEndDate, setCustomEndDate] = useState('');
     const [copiedLink, setCopiedLink] = useState(false);
     const [showQrModal, setShowQrModal] = useState(false);
     const [sendingId, setSendingId] = useState(null);
@@ -35,9 +95,10 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
+            // Traemos todos los registros para permitir análisis reactivo continuo
             const data = await fetchPrevenirLeads({
-                dateFilter: filterDate,
-                search: search,
+                dateFilter: 'all',
+                limit: 2000
             });
             setLeads(data || []);
         } catch (err) {
@@ -46,22 +107,172 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
         } finally {
             setLoading(false);
         }
-    }, [filterDate, search, addToast]);
+    }, [addToast]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
-    const filteredLeads = leads;
+    // Función auxiliar para obtener fecha YYYY-MM-DD en hora local
+    const getLocalDateStr = (d) => {
+        if (!d) return '';
+        const dateObj = typeof d === 'string' ? new Date(d) : d;
+        if (isNaN(dateObj.getTime())) return '';
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
 
-    // Métricas en tiempo real
-    const metrics = useMemo(() => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const hoy = leads.filter(l => l.created_at && l.created_at.startsWith(todayStr)).length;
-        const mensajesEnviados = leads.filter(l => l.mensaje_enviado).length;
-        const total = leads.length;
-        return { total, hoy, mensajesEnviados };
-    }, [leads]);
+    // Rango de fechas según período seleccionado
+    const periodRange = useMemo(() => {
+        const today = new Date();
+        const end = new Date(today);
+        end.setHours(23, 59, 59, 999);
+
+        let start = new Date(today);
+        start.setHours(0, 0, 0, 0);
+
+        if (selectedPeriod === '7d') {
+            start.setDate(today.getDate() - 6);
+        } else if (selectedPeriod === '14d') {
+            start.setDate(today.getDate() - 13);
+        } else if (selectedPeriod === '30d') {
+            start.setDate(today.getDate() - 29);
+        } else if (selectedPeriod === 'month') {
+            start = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0);
+        } else if (selectedPeriod === 'custom') {
+            if (customStartDate) {
+                const [y, m, d] = customStartDate.split('-').map(Number);
+                start = new Date(y, m - 1, d, 0, 0, 0, 0);
+            } else {
+                start.setDate(today.getDate() - 6);
+            }
+            if (customEndDate) {
+                const [y, m, d] = customEndDate.split('-').map(Number);
+                end.setTime(new Date(y, m - 1, d, 23, 59, 59, 999).getTime());
+            }
+        } else if (selectedPeriod === 'all') {
+            if (leads.length > 0) {
+                const minTime = Math.min(...leads.map(l => new Date(l.created_at).getTime()).filter(t => !isNaN(t)));
+                if (isFinite(minTime)) {
+                    start = new Date(minTime);
+                    start.setHours(0, 0, 0, 0);
+                } else {
+                    start.setDate(today.getDate() - 29);
+                }
+            } else {
+                start.setDate(today.getDate() - 29);
+            }
+        }
+
+        return { start, end };
+    }, [selectedPeriod, customStartDate, customEndDate, leads]);
+
+    // Métricas y datos diarios para gráfico y análisis
+    const { chartData, periodMetrics, periodLeads } = useMemo(() => {
+        const { start, end } = periodRange;
+        const startTime = start.getTime();
+        const endTime = end.getTime();
+
+        // 1. Filtrar prospectos en el rango
+        const inPeriod = leads.filter(l => {
+            if (!l.created_at) return false;
+            const t = new Date(l.created_at).getTime();
+            return t >= startTime && t <= endTime;
+        });
+
+        // 2. Construir días continuos para el gráfico
+        const days = [];
+        const curr = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        const endNorm = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+        let count = 0;
+        while (curr <= endNorm && count < 370) {
+            const ymd = getLocalDateStr(curr);
+            const dayLabel = curr.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+            const weekday = curr.toLocaleDateString('es-AR', { weekday: 'short' });
+            const fullDate = curr.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+            days.push({
+                dateKey: ymd,
+                label: `${dayLabel}`,
+                weekday: weekday.charAt(0).toUpperCase() + weekday.slice(1),
+                fullDate: fullDate.charAt(0).toUpperCase() + fullDate.slice(1),
+                total: 0,
+                prevenir: 0,
+                chequeoAnual: 0,
+            });
+
+            curr.setDate(curr.getDate() + 1);
+            count++;
+        }
+
+        // 3. Mapear prospectos a los días
+        inPeriod.forEach(l => {
+            const dKey = getLocalDateStr(new Date(l.created_at));
+            const dayItem = days.find(d => d.dateKey === dKey);
+            if (dayItem) {
+                dayItem.total += 1;
+                const t = (l.tipo_chequeo || '').toLowerCase();
+                if (t.includes('prevenir')) {
+                    dayItem.prevenir += 1;
+                } else {
+                    dayItem.chequeoAnual += 1;
+                }
+            }
+        });
+
+        // 4. Métricas calculadas
+        const totalPeriod = inPeriod.length;
+        const totalDias = Math.max(days.length, 1);
+        const promedioDiario = (totalPeriod / totalDias).toFixed(1);
+
+        let picoCount = 0;
+        let picoDay = null;
+        days.forEach(d => {
+            if (d.total > picoCount) {
+                picoCount = d.total;
+                picoDay = d;
+            }
+        });
+
+        const totalPrevenir = inPeriod.filter(l => (l.tipo_chequeo || '').toLowerCase().includes('prevenir')).length;
+        const totalChequeo = totalPeriod - totalPrevenir;
+        const pctPrevenir = totalPeriod > 0 ? Math.round((totalPrevenir / totalPeriod) * 100) : 0;
+        const pctChequeo = totalPeriod > 0 ? Math.round((totalChequeo / totalPeriod) * 100) : 0;
+
+        return {
+            chartData: days,
+            periodLeads: inPeriod,
+            periodMetrics: {
+                totalPeriod,
+                totalDias,
+                promedioDiario,
+                picoCount,
+                picoLabel: picoDay && picoCount > 0 ? `${picoDay.label} (${picoCount})` : (picoCount > 0 ? `${picoCount}` : 'Sin captaciones'),
+                picoFullDate: picoDay?.fullDate || '',
+                totalPrevenir,
+                totalChequeo,
+                pctPrevenir,
+                pctChequeo,
+            }
+        };
+    }, [leads, periodRange]);
+
+    // Filtrar tabla por búsqueda en tiempo real
+    const filteredLeads = useMemo(() => {
+        if (!search.trim()) return periodLeads;
+        const q = search.toLowerCase().trim();
+        return periodLeads.filter(l =>
+            (l.nombre_completo && l.nombre_completo.toLowerCase().includes(q)) ||
+            (l.dni && String(l.dni).includes(q)) ||
+            (l.telefono && String(l.telefono).includes(q)) ||
+            (l.telefono_wa && String(l.telefono_wa).includes(q)) ||
+            (l.registrado_por && l.registrado_por.toLowerCase().includes(q)) ||
+            (l.obra_social && l.obra_social.toLowerCase().includes(q))
+        );
+    }, [periodLeads, search]);
 
     // Copiar link al portapapeles
     const handleCopyLink = () => {
@@ -145,9 +356,9 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
     };
 
     return (
-        <div style={{ padding: '24px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '24px', minHeight: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
             {/* Header del Panel */}
-            <div style={{ marginBottom: '20px', flexShrink: 0 }}>
+            <div style={{ marginBottom: '18px', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                         <h2 style={{
@@ -164,7 +375,7 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                             Programa Prevenir — Obra Social Provincia
                         </h2>
                         <p style={{ color: '#64748b', fontSize: '0.84rem', margin: '4px 0 0 48px' }}>
-                            Gestión y auditoría de prospectos captados en territorio para chequeos preventivos
+                            Gestión, métricas y auditoría de prospectos captados en territorio para chequeos preventivos
                         </p>
                     </div>
 
@@ -212,7 +423,7 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                             }}
                         >
                             <Download size={15} />
-                            Exportar Excel
+                            Exportar Excel ({filteredLeads.length})
                         </button>
 
                         {/* Botón Refrescar */}
@@ -230,80 +441,297 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                     </div>
                 </div>
 
-                {/* Métricas Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                {/* Métricas por Período Seleccionado */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                    {/* Tarjeta 1: Total Captados en Período */}
                     <div style={{
                         background: '#ffffff', borderRadius: '12px', padding: '14px 18px',
-                        border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                        border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
                     }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>TOTAL CAPTADOS</div>
-                        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
-                            {metrics.total}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.3px' }}>
+                                TOTAL CAPTADOS
+                            </span>
+                            <div style={{
+                                width: '28px', height: '28px', borderRadius: '7px',
+                                background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#2563eb'
+                            }}>
+                                <Users size={15} />
+                            </div>
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 600, marginTop: '2px' }}>
-                            Base Programa Prevenir
+                        <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+                            {periodMetrics.totalPeriod}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                            En el período ({periodMetrics.totalDias} días) • Base total: <strong style={{ color: '#0f172a' }}>{leads.length}</strong>
                         </div>
                     </div>
 
+                    {/* Tarjeta 2: Promedio Diario */}
                     <div style={{
                         background: '#ffffff', borderRadius: '12px', padding: '14px 18px',
-                        border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                        border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
                     }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>CAPTADOS HOY EN OSP</div>
-                        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2563eb', marginTop: '2px' }}>
-                            {metrics.hoy}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.3px' }}>
+                                PROMEDIO DIARIO
+                            </span>
+                            <div style={{
+                                width: '28px', height: '28px', borderRadius: '7px',
+                                background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#16a34a'
+                            }}>
+                                <TrendingUp size={15} />
+                            </div>
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600, marginTop: '2px' }}>
-                            Operativo en curso
+                        <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#16a34a', margin: '4px 0 2px' }}>
+                            {periodMetrics.promedioDiario}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                            Personas captadas por día en este período
                         </div>
                     </div>
 
+                    {/* Tarjeta 3: Pico Máximo Diario */}
                     <div style={{
                         background: '#ffffff', borderRadius: '12px', padding: '14px 18px',
-                        border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                        border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
                     }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>WHATSAPP ENVIADOS</div>
-                        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a', marginTop: '2px' }}>
-                            {metrics.mensajesEnviados}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.3px' }}>
+                                PICO MÁXIMO DIARIO
+                            </span>
+                            <div style={{
+                                width: '28px', height: '28px', borderRadius: '7px',
+                                background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#d97706'
+                            }}>
+                                <Activity size={15} />
+                            </div>
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '2px' }}>
-                            {metrics.total > 0 ? `${Math.round((metrics.mensajesEnviados / metrics.total) * 100)}% contactados` : '0%'}
+                        <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#d97706', margin: '4px 0 2px' }}>
+                            {periodMetrics.picoCount} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#92400e' }}>máx/día</span>
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {periodMetrics.picoCount > 0 ? `Día récord: ${periodMetrics.picoLabel}` : 'Sin captaciones en el rango'}
                         </div>
                     </div>
 
-                    {/* Banner de acceso directo */}
+                    {/* Tarjeta 4: Distribución de Interés */}
                     <div style={{
-                        background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
-                        borderRadius: '12px', padding: '12px 16px',
-                        border: '1px solid #bfdbfe', display: 'flex', flexDirection: 'column',
-                        justifyContent: 'center'
+                        background: '#ffffff', borderRadius: '12px', padding: '14px 18px',
+                        border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
                     }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d4ed8' }}>
-                            ACCESO RÁPIDO PARA EL CELULAR:
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b', letterSpacing: '0.3px' }}>
+                                DISTRIBUCIÓN POR INTERÉS
+                            </span>
+                            <div style={{
+                                width: '28px', height: '28px', borderRadius: '7px',
+                                background: '#fdf2f8', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: '#db2777'
+                            }}>
+                                <Heart size={15} />
+                            </div>
                         </div>
-                        <div style={{
-                            fontSize: '0.8rem', fontWeight: 700, color: '#1e3a8a',
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px'
-                        }}>
-                            {publicUrl}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', margin: '6px 0 4px' }}>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#db2777' }}>
+                                {periodMetrics.totalPrevenir} Prevenir <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>({periodMetrics.pctPrevenir}%)</span>
+                            </span>
+                            <span style={{ color: '#cbd5e1' }}>•</span>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#2563eb' }}>
+                                {periodMetrics.totalChequeo} Chequeo <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>({periodMetrics.pctChequeo}%)</span>
+                            </span>
                         </div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px' }}>
-                            Sin login requerido • Optimizado para mobile
+                        {/* Mini barra porcentual */}
+                        <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
+                            <div style={{ width: `${periodMetrics.pctPrevenir}%`, background: '#db2777', transition: 'width 0.3s' }} />
+                            <div style={{ width: `${periodMetrics.pctChequeo}%`, background: '#2563eb', transition: 'width 0.3s' }} />
                         </div>
                     </div>
                 </div>
 
-                {/* Barra de Filtros */}
+                {/* Gráfico de Evolución Diaria y Selector de Período */}
                 <div style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    padding: '16px 20px',
+                    marginBottom: '16px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                }}>
+                    {/* Header del Gráfico con Selector de Período */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '12px',
+                        marginBottom: '16px',
+                        borderBottom: '1px solid #f1f5f9',
+                        paddingBottom: '12px'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                                width: '34px', height: '34px', borderRadius: '8px',
+                                background: '#eff6ff', display: 'flex', alignItems: 'center',
+                                justifyContent: 'center', color: '#1d4ed8'
+                            }}>
+                                <BarChart2 size={18} />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
+                                    Cantidad de Personas Captadas Día por Día
+                                </h3>
+                                <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: '#64748b' }}>
+                                    Evolución temporal continua en el período seleccionado ({periodMetrics.totalPeriod} captados en {periodMetrics.totalDias} días)
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Selector de Períodos (Pills) */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f8fafc', padding: '4px', borderRadius: '8px', border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                            {[
+                                { key: '7d', label: '7 días' },
+                                { key: '14d', label: '14 días' },
+                                { key: '30d', label: '30 días' },
+                                { key: 'month', label: 'Este Mes' },
+                                { key: 'all', label: 'Todo' },
+                                { key: 'custom', label: 'Personalizado' },
+                            ].map(p => (
+                                <button
+                                    key={p.key}
+                                    onClick={() => setSelectedPeriod(p.key)}
+                                    style={{
+                                        padding: '5px 12px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: selectedPeriod === p.key ? 700 : 600,
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        background: selectedPeriod === p.key ? '#2563eb' : 'transparent',
+                                        color: selectedPeriod === p.key ? '#ffffff' : '#64748b',
+                                        boxShadow: selectedPeriod === p.key ? '0 1px 2px rgba(37,99,235,0.2)' : 'none',
+                                        transition: 'all 0.15s'
+                                    }}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Inputs de Rango Personalizado */}
+                    {selectedPeriod === 'custom' && (
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            background: '#eff6ff', padding: '10px 14px', borderRadius: '8px',
+                            border: '1px solid #bfdbfe', marginBottom: '14px', flexWrap: 'wrap'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <CalendarRange size={15} color="#1d4ed8" />
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e3a8a' }}>Rango personalizado:</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600 }}>Desde:</span>
+                                <input
+                                    type="date"
+                                    value={customStartDate}
+                                    onChange={(e) => setCustomStartDate(e.target.value)}
+                                    style={{
+                                        padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1',
+                                        fontSize: '0.76rem', background: '#fff', outline: 'none'
+                                    }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600 }}>Hasta:</span>
+                                <input
+                                    type="date"
+                                    value={customEndDate}
+                                    onChange={(e) => setCustomEndDate(e.target.value)}
+                                    style={{
+                                        padding: '4px 8px', borderRadius: '6px', border: '1px solid #cbd5e1',
+                                        fontSize: '0.76rem', background: '#fff', outline: 'none'
+                                    }}
+                                />
+                            </div>
+                            {(customStartDate || customEndDate) && (
+                                <button
+                                    onClick={() => { setCustomStartDate(''); setCustomEndDate(''); }}
+                                    style={{
+                                        fontSize: '0.72rem', color: '#1d4ed8', background: 'none', border: 'none',
+                                        cursor: 'pointer', textDecoration: 'underline', fontWeight: 600
+                                    }}
+                                >
+                                    Limpiar fechas
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Gráfico Recharts de Barras Diarias */}
+                    <div style={{ width: '100%', height: 230 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} margin={{ top: 12, right: 10, left: -22, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis
+                                    dataKey="label"
+                                    tick={{ fontSize: 11, fill: '#64748b' }}
+                                    tickLine={false}
+                                    axisLine={{ stroke: '#e2e8f0' }}
+                                />
+                                <YAxis
+                                    allowDecimals={false}
+                                    tick={{ fontSize: 11, fill: '#64748b' }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <Tooltip content={<CustomChartTooltip />} />
+                                <Bar dataKey="prevenir" name="Programa Prevenir" stackId="a" fill="#db2777" radius={[0, 0, 0, 0]} maxBarSize={40} />
+                                <Bar dataKey="chequeoAnual" name="Chequeo Anual" stackId="a" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Leyenda y Subtítulo del Gráfico */}
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #f8fafc',
+                        fontSize: '0.74rem', color: '#64748b', flexWrap: 'wrap', gap: '8px'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#db2777', display: 'inline-block' }}></span>
+                                Programa Prevenir ({periodMetrics.totalPrevenir})
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: '#2563eb', display: 'inline-block' }}></span>
+                                Chequeo Anual ({periodMetrics.totalChequeo})
+                            </span>
+                        </div>
+                        <div style={{ fontStyle: 'italic', color: '#94a3b8' }}>
+                            * Haz clic en una barra para ver el detalle del día en el tooltip
+                        </div>
+                    </div>
+                </div>
+
+                {/* Barra de Búsqueda y Filtros de la Tabla */}
+                <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap',
                     padding: '10px 14px', background: '#ffffff', borderRadius: '10px',
                     border: '1px solid #e2e8f0'
                 }}>
-                    <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
                         <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '10px' }} />
                         <input
                             type="text"
-                            placeholder="Buscar por nombre, teléfono, DNI o captador..."
+                            placeholder="Buscar por nombre, teléfono, DNI, obra social o captador..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             style={{
@@ -315,20 +743,14 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                         />
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Fecha:</span>
-                        <select
-                            value={filterDate}
-                            onChange={(e) => setFilterDate(e.target.value)}
-                            style={{
-                                height: '34px', padding: '0 8px', borderRadius: '6px',
-                                border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#fff',
-                                fontWeight: 600, color: '#334155', outline: 'none'
-                            }}
-                        >
-                            <option value="all">Todos los registros</option>
-                            <option value="today">Solo los de Hoy</option>
-                        </select>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                            fontSize: '0.75rem', fontWeight: 700, color: '#334155',
+                            background: '#f8fafc', padding: '6px 12px', borderRadius: '6px',
+                            border: '1px solid #e2e8f0'
+                        }}>
+                            Mostrando <strong style={{ color: '#2563eb' }}>{filteredLeads.length}</strong> de {periodMetrics.totalPeriod} registros del período
+                        </span>
                     </div>
                 </div>
             </div>
