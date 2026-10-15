@@ -66,6 +66,7 @@ export default function PrevenirPublicForm() {
     const [todayLeads, setTodayLeads] = useState([]);
     const [loadingLeads, setLoadingLeads] = useState(false);
     const [showDrawer, setShowDrawer] = useState(false);
+    const [sendingLeadId, setSendingLeadId] = useState(null);
 
     const nombreInputRef = useRef(null);
 
@@ -131,6 +132,23 @@ export default function PrevenirPublicForm() {
         loadTodayLeads();
     }, []);
 
+    // Reenviar plantilla de WhatsApp desde el drawer móvil
+    const handleResendWhatsApp = async (lead) => {
+        if (!lead || !lead.id || sendingLeadId === lead.id) return;
+        setSendingLeadId(lead.id);
+        try {
+            await sendPrevenirWhatsApp({ lead });
+            const primerNombre = lead.nombre_completo ? lead.nombre_completo.split(' ')[0] : 'El paciente';
+            setSuccessMessage(`¡Plantilla enviada con éxito a ${primerNombre}!`);
+            await loadTodayLeads();
+        } catch (err) {
+            console.error('Error reenviando plantilla:', err);
+            setErrorMessage(`No se pudo enviar la plantilla: ${err.message || 'Error de conexión'}`);
+        } finally {
+            setSendingLeadId(null);
+        }
+    };
+
     // Enviar formulario
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -185,9 +203,9 @@ export default function PrevenirPublicForm() {
             // Notificación amigable
             const primerNombre = nombre.trim().split(' ')[0];
             if (waStatus === 'enviado') {
-                setSuccessMessage(`¡Excelente! ${primerNombre} fue registrado y se le envió el WhatsApp de bienvenida.`);
+                setSuccessMessage(`¡Excelente! ${primerNombre} fue registrado y recibió el WhatsApp oficial de bienvenida.`);
             } else if (waStatus === 'error_wa') {
-                setSuccessMessage(`¡Registrado con éxito! ${primerNombre} quedó guardado (el mensaje de WhatsApp podrá enviarse luego).`);
+                setSuccessMessage(`¡Registrado con éxito! ${primerNombre} quedó guardado (podés enviar el WhatsApp desde el historial arriba).`);
             } else {
                 setSuccessMessage(`¡Registrado con éxito! ${primerNombre} guardado en el Programa Prevenir.`);
             }
@@ -814,10 +832,10 @@ export default function PrevenirPublicForm() {
                         <Send size={16} color={autoSendWhatsapp ? '#059669' : '#94a3b8'} />
                         <div>
                             <div style={{ fontSize: '0.8rem', fontWeight: 700, color: autoSendWhatsapp ? '#065f46' : '#475569' }}>
-                                Enviar WhatsApp automático
+                                Enviar WhatsApp oficial automático
                             </div>
                             <div style={{ fontSize: '0.7rem', color: autoSendWhatsapp ? '#047857' : '#64748b' }}>
-                                Bienvenida del Programa Prevenir al registrar
+                                Plantilla Meta: bienvenida_programa_prevenir (vía BuilderBot)
                             </div>
                         </div>
                     </div>
@@ -994,20 +1012,29 @@ export default function PrevenirPublicForm() {
                                                     borderRadius: '6px',
                                                     border: '1px solid #a7f3d0'
                                                 }}>
-                                                    WA Enviado
+                                                    ✓ WA Enviado
                                                 </span>
                                             ) : (
-                                                <span style={{
-                                                    fontSize: '0.65rem',
-                                                    fontWeight: 700,
-                                                    background: '#fef3c7',
-                                                    color: '#d97706',
-                                                    padding: '3px 7px',
-                                                    borderRadius: '6px',
-                                                    border: '1px solid #fde68a'
-                                                }}>
-                                                    Guardado
-                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleResendWhatsApp(item)}
+                                                    disabled={sendingLeadId === item.id}
+                                                    style={{
+                                                        fontSize: '0.68rem',
+                                                        fontWeight: 700,
+                                                        background: '#25D366',
+                                                        color: '#ffffff',
+                                                        padding: '4px 8px',
+                                                        borderRadius: '6px',
+                                                        border: 'none',
+                                                        cursor: sendingLeadId === item.id ? 'not-allowed' : 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}
+                                                >
+                                                    {sendingLeadId === item.id ? 'Enviando...' : '📲 Enviar WA'}
+                                                </button>
                                             )}
                                         </div>
                                     </div>

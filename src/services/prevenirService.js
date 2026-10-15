@@ -239,43 +239,120 @@ export async function deletePrevenirLead(id) {
 }
 
 /**
- * Envía mensaje de WhatsApp automático o personalizado a un prospecto del Programa Prevenir
- * Usa Edge Function 'send-whatsapp' con la línea line_recepciones
+ * Obtiene el primer nombre capitalizado de forma prolija
+ * Ej: "MARIA PEREZ" -> "Maria", "juan" -> "Juan"
  */
-export async function sendPrevenirWhatsApp({ lead, customMessage = null }) {
+export function getFirstName(fullName) {
+    if (!fullName) return 'Estimado/a';
+    const first = fullName.trim().split(/\s+/)[0];
+    if (!first) return 'Estimado/a';
+    return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+/**
+ * Mapea el tipo de chequeo al texto natural para la plantilla
+ * {{2}}: "Programa Prevenir" o "Chequeo anual"
+ */
+export function getPrevenirTemplateLabel(tipoChequeo) {
+    if (!tipoChequeo) return 'Programa Prevenir';
+    const lower = String(tipoChequeo).toLowerCase();
+    if (lower.includes('anual') || lower.includes('chequeo')) {
+        return 'Chequeo anual';
+    }
+    return 'Programa Prevenir';
+}
+
+/**
+ * Envía mensaje de WhatsApp a un prospecto del Programa Prevenir
+ * Por defecto dispara la plantilla Meta aprobada: 'bienvenida_programa_prevenir'
+ * mediante la API de BuilderBot Cloud (Edge Function send-whatsapp).
+ * 
+ * Variables de la plantilla:
+ *  {{1}} = Nombre del paciente
+ *  {{2}} = 'Programa Prevenir' | 'Chequeo anual'
+ */
+export async function sendPrevenirWhatsApp({ lead, customMessage = null, lineId = 'line_recepciones' }) {
     if (!lead || !lead.telefono_wa) {
         throw new Error('El paciente no tiene un número de WhatsApp válido');
     }
 
-    const nombre = lead.nombre_completo ? lead.nombre_completo.split(' ')[0] : 'Estimado/a';
+    const primerNombre = getFirstName(lead.nombre_completo);
+    const tipoInteres = getPrevenirTemplateLabel(lead.tipo_chequeo);
 
-    const messageText = customMessage || (
-        `¡Hola *${nombre}*! 👋 Te contactamos de *Sanatorio Argentino*.\n\n` +
-        `Muchas gracias por acercarte a nuestro stand del *Programa Prevenir* en Obra Social Provincia. 🏥✨\n\n` +
-        `Queremos acompañarte en el cuidado de tu salud preventiva. Si deseás consultar los estudios incluidos con tu cobertura de Obra Social Provincia o coordinar tu turno para el chequeo, podés responder directamente a este mensaje.\n\n` +
-        `¡Que tengas un excelente día! 💙`
-    );
+    let result = null;
+    let messageContentForChat = '';
 
-    // Enviar via Edge Function
-    const { data, error } = await supabase.functions.invoke('send-whatsapp', {
-        body: {
-            lineId: 'line_recepciones',
-            number: lead.telefono_wa,
-            content: messageText,
-        },
-    });
+    if (customMessage) {
+        // Envío de texto personalizado manual
+        const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+            body: {
+                lineId,
+                number: lead.telefono_wa,
+                content: customMessage,
+            },
+        });
 
-    if (error) {
-        console.error('Error invocando send-whatsapp:', error);
-        throw new Error(error.message || 'Error al enviar mensaje por WhatsApp');
+        if (error) {
+            console.error('Error enviando mensaje personalizado:', error);
+            throw new Error(error.message || 'Error al enviar WhatsApp');
+        }
+        result = data;
+        messageContentForChat = customMessage;
+    } else {
+        // Envío de Plantilla Oficial Meta aprobada: bienvenida_programa_prevenir
+        const components = [
+            {
+                type: 'body',
+                parameters: [
+                    { type: 'text', text: primerNombre },
+                    { type: 'text', text: tipoInteres },
+                ]
+            }
+        ];
+
+        const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+            body: {
+                action: 'send_template',
+                lineId,
+                number: lead.telefono_wa,
+                templateName: 'bienvenida_programa_prevenir',
+                languageCode: 'es_AR',
+                components,
+            },
+        });
+
+        if (error) {
+            console.error('Error invocando send-whatsapp template:', error);
+            throw new Error(error.message || 'Error al enviar plantilla oficial por WhatsApp');
+        }
+
+        if (data && data.success === false) {
+            const apiData = data.data || {};
+            const errMsg = apiData.message || apiData.error?.message || apiData.error || data.error || 'Error en BuilderBot API al enviar plantilla';
+            console.error('BuilderBot template error:', data);
+            throw new Error(errMsg);
+        }
+
+        result = data;
+        messageContentForChat = `📋 [Plantilla Meta: bienvenida_programa_prevenir]\n` +
+            `¡Hola ${primerNombre}! 👋\n\n` +
+            `Muchas gracias por acercarte a nuestro stand de *Sanatorio Argentino* en Obra Social Provincia. 🏥✨\n\n` +
+            `Registramos tu interés en realizarte el *${tipoInteres}*.\n` +
+            `Queremos acompañarte en el cuidado de tu salud con nuestro circuito integral de estudios médicos preventivos.\n\n` +
+            `Si deseás conocer los estudios incluidos con tu cobertura o agendar un turno, por favor respondé a este mensaje y te asesoramos de inmediato.`;
     }
 
-    // Guardar en la bandeja de mensajería (whatsapp_messages)
+    // Registrar en la bandeja de mensajería (whatsapp_messages) para visualización en Chat CRM
     await saveOutgoingMessage({
         phone: lead.telefono_wa,
-        content: messageText,
+        content: messageContentForChat,
         mediaType: 'text',
-        lineId: 'line_recepciones',
+        lineId,
+        rawPayload: {
+            template_name: 'bienvenida_programa_prevenir',
+            language: 'es_AR',
+            parameters: [primerNombre, tipoInteres],
+        }
     }).catch(err => console.warn('Error saving outgoing message in chat:', err));
 
     // Actualizar estado en la tabla del lead
@@ -285,5 +362,5 @@ export async function sendPrevenirWhatsApp({ lead, customMessage = null }) {
         estado: 'contactado',
     }).catch(console.error);
 
-    return { success: true, data };
+    return { success: true, data: result };
 }
