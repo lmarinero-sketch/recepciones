@@ -17,11 +17,28 @@ import {
 } from '../services/prevenirService';
 
 const CHEQUEO_OPTIONS = [
-    { id: 'General', label: 'Chequeo General', icon: '🩺' },
-    { id: 'Mujer', label: 'Chequeo Mujer / Gineco', icon: '🌸' },
-    { id: 'Hombre', label: 'Chequeo Hombre / Uro', icon: '👔' },
-    { id: 'Cardiológico', label: 'Cardiológico', icon: '🫀' },
-    { id: 'Deportivo', label: 'Deportivo', icon: '🏃' },
+    {
+        id: 'Prevenir',
+        label: 'Prevenir',
+        icon: '🌸',
+        color: '#db2777',
+        activeBg: '#ec4899',
+        activeText: '#ffffff',
+        inactiveBg: '#fdf2f8',
+        borderColor: '#f472b6',
+        hoverBg: '#fce7f3'
+    },
+    {
+        id: 'Chequeo anual',
+        label: 'Chequeo anual',
+        icon: '🩺',
+        color: '#059669',
+        activeBg: '#10b981',
+        activeText: '#ffffff',
+        inactiveBg: '#f0fdf4',
+        borderColor: '#6ee7b7',
+        hoverBg: '#dcfce7'
+    },
 ];
 
 const CAPTADORES = ['Gisela', 'Pasante', 'Otro'];
@@ -38,7 +55,7 @@ export default function PrevenirPublicForm() {
     const [osDropdownOpen, setOsDropdownOpen] = useState(false);
     const osDropdownRef = useRef(null);
     const osInputRef = useRef(null);
-    const [tipoChequeo, setTipoChequeo] = useState('General');
+    const [tipoChequeo, setTipoChequeo] = useState('Prevenir');
     const [registradoPor, setRegistradoPor] = useState(() => localStorage.getItem('prevenir_captador') || 'Gisela');
     const [otroCaptador, setOtroCaptador] = useState('');
     const [observaciones, setObservaciones] = useState('');
@@ -771,12 +788,12 @@ export default function PrevenirPublicForm() {
                     )}
                 </div>
 
-                {/* Tipo de Chequeo / Interés (Chips de 1 toque) */}
+                {/* Tipo de Interés (Prevenir en rosado / Chequeo anual en verde) */}
                 <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                        Tipo de Chequeo de Interés
+                        Tipo de Interés
                     </label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                         {CHEQUEO_OPTIONS.map(opt => {
                             const isSelected = tipoChequeo === opt.id;
                             return (
@@ -785,25 +802,25 @@ export default function PrevenirPublicForm() {
                                     key={opt.id}
                                     onClick={() => setTipoChequeo(opt.id)}
                                     style={{
-                                        flex: '1 1 auto',
-                                        minWidth: '130px',
-                                        padding: '8px 12px',
-                                        borderRadius: '10px',
-                                        border: isSelected ? '1.5px solid #1d4ed8' : '1px solid #e2e8f0',
-                                        background: isSelected ? '#eff6ff' : '#f8fafc',
-                                        color: isSelected ? '#1d4ed8' : '#475569',
-                                        fontSize: '0.78rem',
-                                        fontWeight: isSelected ? 800 : 600,
+                                        padding: '12px 10px',
+                                        borderRadius: '12px',
+                                        border: isSelected ? `2.5px solid ${opt.activeBg}` : `1.5px solid ${opt.borderColor}`,
+                                        background: isSelected ? opt.activeBg : opt.inactiveBg,
+                                        color: isSelected ? opt.activeText : opt.color,
+                                        fontSize: '0.92rem',
+                                        fontWeight: 800,
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        gap: '6px',
+                                        gap: '8px',
+                                        boxShadow: isSelected ? `0 4px 12px ${opt.color}40` : 'none',
                                         transition: 'all 0.15s ease'
                                     }}
                                 >
-                                    <span>{opt.icon}</span>
+                                    <span style={{ fontSize: '1.1rem' }}>{opt.icon}</span>
                                     <span>{opt.label}</span>
+                                    {isSelected && <Check size={16} color="#ffffff" style={{ marginLeft: '2px' }} />}
                                 </button>
                             );
                         })}
@@ -1056,8 +1073,17 @@ export default function PrevenirPublicForm() {
                                             </div>
                                             <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', gap: '8px', marginTop: '2px' }}>
                                                 {item.edad !== null && <span>🎂 {item.edad} años</span>}
-                                                <span>📞 {item.telefono}</span>
-                                                <span style={{ color: '#1d4ed8' }}>• {item.tipo_chequeo}</span>
+                                                <span style={{
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 800,
+                                                    color: item.tipo_chequeo === 'Prevenir' ? '#db2777' : '#059669',
+                                                    background: item.tipo_chequeo === 'Prevenir' ? '#fdf2f8' : '#f0fdf4',
+                                                    padding: '1px 6px',
+                                                    borderRadius: '4px',
+                                                    border: item.tipo_chequeo === 'Prevenir' ? '1px solid #fbcfe8' : '1px solid #bbf7d0'
+                                                }}>
+                                                    {item.tipo_chequeo}
+                                                </span>
                                             </div>
                                             <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
                                                 Por {item.registrado_por} • {new Date(item.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}

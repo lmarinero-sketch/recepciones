@@ -451,13 +451,14 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                                             <td style={{ padding: '12px 16px' }}>
                                                 <span style={{
                                                     fontSize: '0.72rem',
-                                                    fontWeight: 700,
-                                                    background: '#f1f5f9',
-                                                    color: '#334155',
+                                                    fontWeight: 800,
+                                                    background: lead.tipo_chequeo === 'Prevenir' ? '#fdf2f8' : (lead.tipo_chequeo === 'Chequeo anual' ? '#f0fdf4' : '#f1f5f9'),
+                                                    color: lead.tipo_chequeo === 'Prevenir' ? '#db2777' : (lead.tipo_chequeo === 'Chequeo anual' ? '#059669' : '#334155'),
                                                     padding: '3px 8px',
-                                                    borderRadius: '6px'
+                                                    borderRadius: '6px',
+                                                    border: lead.tipo_chequeo === 'Prevenir' ? '1px solid #fbcfe8' : (lead.tipo_chequeo === 'Chequeo anual' ? '1px solid #bbf7d0' : '1px solid #e2e8f0'),
                                                 }}>
-                                                    {lead.tipo_chequeo || 'General'}
+                                                    {lead.tipo_chequeo || 'Prevenir'}
                                                 </span>
                                             </td>
 
