@@ -12,6 +12,7 @@ import TemplateManager from './components/TemplateManager.jsx';
 import WhatsAppLineStatus from './components/WhatsAppLineStatus.jsx';
 import HomePanel from './components/HomePanel.jsx';
 import ChequeoPanel from './components/ChequeoPanel.jsx';
+import PrevenirAdminPanel from './components/PrevenirAdminPanel.jsx';
 import ConfigPanel from './components/ConfigPanel.jsx';
 import MetricasChequeoPanel from './components/MetricasChequeoPanel.jsx';
 import RecordatoriosPanel from './components/RecordatoriosPanel.jsx';
@@ -174,7 +175,7 @@ function App({ currentUser, onLogout }) {
                                 <span key={`s-${i}`} className="topbar__wave-letter" style={{ animationDelay: `${(12 + i) * 0.08}s` }}>{char === ' ' ? '\u00A0' : char}</span>
                             ))}
                         </h1>
-                        <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'chequeos' ? 'Marketing — Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'metricas' ? 'Métricas de Chequeos' : activeView === 'recordatorios' ? 'Recordatorios de Turnos' : activeView === 'metricas_recordatorios' ? 'Métricas de Recordatorios' : activeView === 'encuestas_calidad' ? 'Encuestas de Calidad — Post Chequeo' : activeView === 'metricas_encuestas' ? 'Métricas de Encuestas' : activeView === 'ocupacion' ? 'Alquileres — Ocupación de Consultorios' : activeView === 'novedades' ? 'Alquileres — Novedades' : activeView === 'liquidacion' ? 'Alquileres — Liquidación' : activeView === 'dashboard_alquileres' ? 'Alquileres — Dashboard' : activeView === 'onboarding' ? 'Alquileres — Incorporación de Médicos' : activeView === 'historial_periodos' ? 'Alquileres — Historial' : activeView === 'catalogo' ? 'Alquileres — Catálogo Comercial' : 'Centro de Mensajería'}</span>
+                        <span className="topbar__subtitle">{activeView === 'inicio' ? 'Guía y Ayuda del Sistema' : activeView === 'prevenir' ? 'Programa Prevenir — Obra Social Provincia' : activeView === 'chequeos' ? 'Marketing — Chequeos Preventivos' : activeView === 'configuracion' ? 'Configuración del Sistema' : activeView === 'metricas' ? 'Métricas de Chequeos' : activeView === 'recordatorios' ? 'Recordatorios de Turnos' : activeView === 'metricas_recordatorios' ? 'Métricas de Recordatorios' : activeView === 'encuestas_calidad' ? 'Encuestas de Calidad — Post Chequeo' : activeView === 'metricas_encuestas' ? 'Métricas de Encuestas' : activeView === 'ocupacion' ? 'Alquileres — Ocupación de Consultorios' : activeView === 'novedades' ? 'Alquileres — Novedades' : activeView === 'liquidacion' ? 'Alquileres — Liquidación' : activeView === 'dashboard_alquileres' ? 'Alquileres — Dashboard' : activeView === 'onboarding' ? 'Alquileres — Incorporación de Médicos' : activeView === 'historial_periodos' ? 'Alquileres — Historial' : activeView === 'catalogo' ? 'Alquileres — Catálogo Comercial' : 'Centro de Mensajería'}</span>
                     </div>
                     
                     {/* WhatsAppLineStatus removido — sistema unificado a una sola cuenta BuilderBot */}
@@ -249,6 +250,10 @@ function App({ currentUser, onLogout }) {
                     <div className="content no-print">
                         <TemplateManager addToast={addToast} />
                     </div>
+                )}
+
+                {activeView === 'prevenir' && (
+                    <PrevenirAdminPanel addToast={addToast} onViewChange={setActiveView} />
                 )}
 
                 {activeView === 'chequeos' && (

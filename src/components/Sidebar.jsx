@@ -4,6 +4,7 @@ import {
     ChevronDown, Home, MessageSquareText, MessageCircle,
     Brain, HeartPulse, RefreshCw, BarChart3, Bell, ClipboardCheck,
     Building2, FileText, DollarSign, LayoutDashboard, UserPlus, FolderClock, Megaphone, X,
+    HeartHandshake,
 } from 'lucide-react';
 
 export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile, activeView, onViewChange, unreadMessageCount = 0 }) {
@@ -20,6 +21,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile
     const isMensajeriaActive = mensajeriaSubItems.some(i => activeView === i.id);
 
     const preventivaSubItems = [
+        { id: 'prevenir', label: 'Programa Prevenir', icon: HeartHandshake },
         { id: 'chequeos', label: 'Marketing', icon: HeartPulse },
         { id: 'recordatorios', label: 'Recordatorios', icon: Bell },
         { id: 'encuestas_calidad', label: 'Encuestas', icon: ClipboardCheck },
