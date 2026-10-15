@@ -15,9 +15,9 @@ const pathname = window.location.pathname;
 const search = window.location.search;
 const hash = window.location.hash;
 
-const isRecepcion = pathname === '/recepcion' || pathname === '/recepcion/';
-const isTurno = pathname === '/turno' || pathname === '/turno/';
-const isPrevenir = pathname === '/prevenir' || pathname === '/prevenir/' || search.includes('view=prevenir') || hash === '#prevenir';
+const isRecepcion = pathname === '/recepcion' || pathname.startsWith('/recepcion');
+const isTurno = pathname === '/turno' || pathname.startsWith('/turno');
+const isPrevenir = pathname === '/prevenir' || pathname.startsWith('/prevenir') || search.includes('prevenir') || hash.includes('prevenir');
 
 const RootComponent = isTurno ? TurnoKiosco : isRecepcion ? RecepcionView : isPrevenir ? PrevenirPublicForm : App;
 
