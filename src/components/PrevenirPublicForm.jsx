@@ -44,7 +44,7 @@ const CHEQUEO_OPTIONS = [
 export default function PrevenirPublicForm() {
     // Form state
     const [nombre, setNombre] = useState('');
-    const [fechaNacimiento, setFechaNacimiento] = useState('');
+    const [edad, setEdad] = useState('');
     const [telefono, setTelefono] = useState('');
     const [dni, setDni] = useState('');
     const [obraSocial, setObraSocial] = useState('001 - PROVINCIA');
@@ -101,10 +101,6 @@ export default function PrevenirPublicForm() {
         return obrasSocialesList.filter(os => os.toLowerCase().includes(s));
     }, [obrasSocialesList, osSearch]);
 
-    // Cálculo dinámico de edad en tiempo real
-    const computedAge = useMemo(() => {
-        return calculateAge(fechaNacimiento);
-    }, [fechaNacimiento]);
 
     // Normalización de teléfono en tiempo real
     const phoneNorm = useMemo(() => {
@@ -177,8 +173,8 @@ export default function PrevenirPublicForm() {
             // 1. Guardar en Supabase
             const saved = await savePrevenirLead({
                 nombre_completo: nombre,
-                fecha_nacimiento: fechaNacimiento || null,
-                edad: computedAge,
+                fecha_nacimiento: null,
+                edad: edad ? parseInt(edad, 10) : null,
                 telefono: telefono,
                 dni: dni,
                 obra_social: obraSocial,
@@ -212,7 +208,7 @@ export default function PrevenirPublicForm() {
 
             // Limpiar formulario para el siguiente entrevistado
             setNombre('');
-            setFechaNacimiento('');
+            setEdad('');
             setTelefono('');
             setDni('');
             setObservaciones('');
@@ -394,48 +390,55 @@ export default function PrevenirPublicForm() {
                     </div>
                 </div>
 
-                {/* Fecha de Nacimiento + Cálculo Automático de Edad */}
+                {/* Edad (rápido, solo número) */}
                 <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                        <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-                            Fecha de Nacimiento
-                        </label>
-                        {computedAge !== null ? (
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
+                        Edad <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>(años)</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                        <input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            min="1"
+                            max="120"
+                            value={edad}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                if (val.length <= 3) setEdad(val);
+                            }}
+                            placeholder="Ej: 45"
+                            style={{
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                height: '48px',
+                                padding: '10px 14px',
+                                fontSize: '1rem',
+                                borderRadius: '10px',
+                                border: '1.5px solid #cbd5e1',
+                                outline: 'none',
+                                background: '#ffffff',
+                                color: '#1e293b',
+                                transition: 'border-color 0.2s',
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#1d4ed8'}
+                            onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+                        />
+                        {edad && (
                             <span style={{
-                                fontSize: '0.8rem',
-                                fontWeight: 800,
-                                background: '#fef3c7',
-                                color: '#92400e',
-                                padding: '3px 8px',
-                                borderRadius: '12px',
-                                border: '1px solid #fde68a'
+                                position: 'absolute',
+                                right: '14px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                fontSize: '0.82rem',
+                                fontWeight: 700,
+                                color: '#64748b',
+                                pointerEvents: 'none'
                             }}>
-                                🎂 {computedAge} años
-                            </span>
-                        ) : (
-                            <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                                (Calcula edad al instante)
+                                años
                             </span>
                         )}
                     </div>
-                    <input
-                        type="date"
-                        value={fechaNacimiento}
-                        onChange={(e) => setFechaNacimiento(e.target.value)}
-                        style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            height: '48px',
-                            padding: '10px 14px',
-                            fontSize: '0.98rem',
-                            borderRadius: '10px',
-                            border: '1.5px solid #cbd5e1',
-                            outline: 'none',
-                            background: '#ffffff',
-                            color: '#1e293b',
-                            cursor: 'pointer'
-                        }}
-                    />
                 </div>
 
                 {/* Teléfono / WhatsApp con mapeo automático para BuilderBot */}
