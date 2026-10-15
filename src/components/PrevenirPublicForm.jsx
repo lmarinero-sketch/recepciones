@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Heart, ShieldCheck, User, Calendar, Phone, CheckCircle2,
     AlertCircle, Sparkles, Send, RefreshCw, FileText, ChevronRight,
-    Users, Plus, Check, Clock, ExternalLink
+    Users, Plus, Check, Clock, ExternalLink, Search, Building2, ChevronDown, X
 } from 'lucide-react';
 import {
     calculateAge,
@@ -11,7 +11,9 @@ import {
     isValidArgentinePhone,
     savePrevenirLead,
     fetchPrevenirLeads,
-    sendPrevenirWhatsApp
+    sendPrevenirWhatsApp,
+    fetchSalusObrasSociales,
+    DEFAULT_SALUS_OBRAS_SOCIALES
 } from '../services/prevenirService';
 
 const CHEQUEO_OPTIONS = [
@@ -30,7 +32,12 @@ export default function PrevenirPublicForm() {
     const [fechaNacimiento, setFechaNacimiento] = useState('');
     const [telefono, setTelefono] = useState('');
     const [dni, setDni] = useState('');
-    const [obraSocial, setObraSocial] = useState('Obra Social Provincia');
+    const [obraSocial, setObraSocial] = useState('001 - PROVINCIA');
+    const [obrasSocialesList, setObrasSocialesList] = useState(DEFAULT_SALUS_OBRAS_SOCIALES);
+    const [osSearch, setOsSearch] = useState('');
+    const [osDropdownOpen, setOsDropdownOpen] = useState(false);
+    const osDropdownRef = useRef(null);
+    const osInputRef = useRef(null);
     const [tipoChequeo, setTipoChequeo] = useState('General');
     const [registradoPor, setRegistradoPor] = useState(() => localStorage.getItem('prevenir_captador') || 'Gisela');
     const [otroCaptador, setOtroCaptador] = useState('');
@@ -48,6 +55,37 @@ export default function PrevenirPublicForm() {
     const [showDrawer, setShowDrawer] = useState(false);
 
     const nombreInputRef = useRef(null);
+
+    // Cargar Obras Sociales registradas en SALUS
+    useEffect(() => {
+        fetchSalusObrasSociales().then(list => {
+            if (list && list.length > 0) {
+                setObrasSocialesList(list);
+            }
+        }).catch(console.warn);
+    }, []);
+
+    // Cerrar dropdown de Obra Social al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (osDropdownRef.current && !osDropdownRef.current.contains(e.target)) {
+                setOsDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, []);
+
+    // Filtrar Obras Sociales por el texto del buscador
+    const filteredOsList = useMemo(() => {
+        if (!osSearch.trim()) return obrasSocialesList;
+        const s = osSearch.toLowerCase().trim();
+        return obrasSocialesList.filter(os => os.toLowerCase().includes(s));
+    }, [obrasSocialesList, osSearch]);
 
     // Guardar captador en localStorage
     const handleCaptadorChange = (val) => {
@@ -518,38 +556,219 @@ export default function PrevenirPublicForm() {
                     />
                 </div>
 
-                {/* Obra Social */}
-                <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '5px' }}>
-                        Obra Social
-                    </label>
-                    <select
-                        value={obraSocial}
-                        onChange={(e) => setObraSocial(e.target.value)}
+                {/* Obra Social con Buscador y SALUS */}
+                <div ref={osDropdownRef} style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
+                            Obra Social (SALUS)
+                        </label>
+                        <span style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 600 }}>
+                            {filteredOsList.length} opciones
+                        </span>
+                    </div>
+
+                    {/* Chips rápidos de 1 toque */}
+                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', marginBottom: '4px', scrollbarWidth: 'none' }}>
+                        {[
+                            { id: '001 - PROVINCIA', label: '001 - PROVINCIA' },
+                            { id: '042 - PARTICULARES', label: 'PARTICULARES' },
+                            { id: '005 - OSDE BINARIO', label: 'OSDE' },
+                            { id: '004 - DAMSU', label: 'DAMSU' },
+                            { id: '121 - SWISS MEDICAL S.A.', label: 'SWISS' },
+                        ].map(chip => (
+                            <button
+                                key={chip.id}
+                                type="button"
+                                onClick={() => {
+                                    setObraSocial(chip.id);
+                                    setOsDropdownOpen(false);
+                                    setOsSearch('');
+                                }}
+                                style={{
+                                    whiteSpace: 'nowrap',
+                                    padding: '4px 9px',
+                                    borderRadius: '14px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: obraSocial === chip.id ? 800 : 600,
+                                    background: obraSocial === chip.id ? '#1d4ed8' : '#f1f5f9',
+                                    color: obraSocial === chip.id ? '#fff' : '#475569',
+                                    border: obraSocial === chip.id ? '1px solid #1d4ed8' : '1px solid #e2e8f0',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                }}
+                            >
+                                {chip.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Input Buscador */}
+                    <div
+                        onClick={() => {
+                            setOsDropdownOpen(true);
+                            osInputRef.current?.focus();
+                        }}
                         style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            height: '46px',
-                            padding: '10px 14px',
-                            fontSize: '0.92rem',
-                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            height: '48px',
+                            padding: '0 12px',
                             borderRadius: '10px',
-                            border: '1.5px solid #cbd5e1',
-                            outline: 'none',
+                            border: osDropdownOpen ? '1.5px solid #1d4ed8' : '1.5px solid #cbd5e1',
                             background: '#ffffff',
-                            color: '#1e293b',
-                            cursor: 'pointer'
+                            boxSizing: 'border-box',
+                            boxShadow: osDropdownOpen ? '0 0 0 3px rgba(29, 78, 216, 0.1)' : 'none',
+                            cursor: 'text',
+                            transition: 'all 0.15s ease'
                         }}
                     >
-                        <option value="Obra Social Provincia">Obra Social Provincia (OSP)</option>
-                        <option value="Particular / Sin Cobertura">Particular / Sin Cobertura</option>
-                        <option value="PAMI">PAMI</option>
-                        <option value="OSDE">OSDE</option>
-                        <option value="Swiss Medical">Swiss Medical</option>
-                        <option value="DAMSU">DAMSU</option>
-                        <option value="OSECAC">OSECAC</option>
-                        <option value="Otra Obra Social">Otra Obra Social</option>
-                    </select>
+                        <Search size={17} color={osDropdownOpen ? '#1d4ed8' : '#94a3b8'} style={{ marginRight: '8px', flexShrink: 0 }} />
+                        <input
+                            ref={osInputRef}
+                            type="text"
+                            placeholder="Buscar obra social (Ej: 001, OSP, OSDE, DAMSU)..."
+                            value={osDropdownOpen ? osSearch : (obraSocial || '')}
+                            onChange={(e) => {
+                                setOsSearch(e.target.value);
+                                setOsDropdownOpen(true);
+                            }}
+                            onFocus={() => {
+                                setOsSearch('');
+                                setOsDropdownOpen(true);
+                            }}
+                            style={{
+                                border: 'none',
+                                outline: 'none',
+                                width: '100%',
+                                fontSize: '0.92rem',
+                                fontWeight: 600,
+                                color: '#1e293b',
+                                background: 'transparent'
+                            }}
+                        />
+
+                        {obraSocial && !osDropdownOpen && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setObraSocial('');
+                                    setOsSearch('');
+                                    setOsDropdownOpen(true);
+                                    osInputRef.current?.focus();
+                                }}
+                                style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    color: '#94a3b8'
+                                }}
+                            >
+                                <X size={15} />
+                            </button>
+                        )}
+
+                        <ChevronDown
+                            size={16}
+                            color="#94a3b8"
+                            style={{
+                                marginLeft: '6px',
+                                flexShrink: 0,
+                                transform: osDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s ease'
+                            }}
+                        />
+                    </div>
+
+                    {/* Dropdown flotante con lista filtrada de SALUS */}
+                    {osDropdownOpen && (
+                        <div style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 4px)',
+                            left: 0,
+                            right: 0,
+                            background: '#ffffff',
+                            borderRadius: '12px',
+                            border: '1px solid #cbd5e1',
+                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                            maxHeight: '260px',
+                            overflowY: 'auto',
+                            zIndex: 9999,
+                            padding: '4px'
+                        }}>
+                            {/* Opción personalizada si el texto no coincide con ninguno */}
+                            {osSearch.trim() && !filteredOsList.some(item => item.toLowerCase() === osSearch.trim().toLowerCase()) && (
+                                <div
+                                    onClick={() => {
+                                        setObraSocial(osSearch.trim().toUpperCase());
+                                        setOsDropdownOpen(false);
+                                        setOsSearch('');
+                                    }}
+                                    style={{
+                                        padding: '10px 12px',
+                                        borderRadius: '8px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 700,
+                                        color: '#1d4ed8',
+                                        background: '#eff6ff',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        marginBottom: '4px'
+                                    }}
+                                >
+                                    <Plus size={15} />
+                                    <span>Usar: <strong>"{osSearch.trim().toUpperCase()}"</strong></span>
+                                </div>
+                            )}
+
+                            {filteredOsList.length === 0 ? (
+                                <div style={{ padding: '14px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                                    No se encontraron obras sociales con "{osSearch}"
+                                </div>
+                            ) : (
+                                filteredOsList.map((item) => {
+                                    const isSelected = obraSocial === item;
+                                    return (
+                                        <div
+                                            key={item}
+                                            onClick={() => {
+                                                setObraSocial(item);
+                                                setOsDropdownOpen(false);
+                                                setOsSearch('');
+                                            }}
+                                            style={{
+                                                padding: '10px 12px',
+                                                borderRadius: '8px',
+                                                fontSize: '0.85rem',
+                                                fontWeight: isSelected ? 800 : 500,
+                                                color: isSelected ? '#1d4ed8' : '#1e293b',
+                                                background: isSelected ? '#eff6ff' : 'transparent',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                transition: 'background 0.15s ease'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!isSelected) e.currentTarget.style.background = '#f8fafc';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (!isSelected) e.currentTarget.style.background = 'transparent';
+                                            }}
+                                        >
+                                            <span>{item}</span>
+                                            {isSelected && <Check size={16} color="#1d4ed8" />}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Tipo de Chequeo / Interés (Chips de 1 toque) */}

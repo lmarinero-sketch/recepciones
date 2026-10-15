@@ -4,6 +4,81 @@ import { saveOutgoingMessage } from './chatService';
 
 export { normalizeArgentinePhone };
 
+export const DEFAULT_SALUS_OBRAS_SOCIALES = [
+    "001 - PROVINCIA",
+    "004 - DAMSU",
+    "005 - OSDE BINARIO",
+    "024 - PODER JUDICIAL",
+    "028 - IOSFA",
+    "038 - AVALIAN SALUD Y BIENESTAR COOPERATIVA LIMITADA",
+    "042 - PARTICULARES",
+    "065 - OMINT S.A.",
+    "066 - MEDICUS S.A.",
+    "074 - COLMED SALUD",
+    "076 - MEDIFE ASOCIACION CIVIL",
+    "097 - SANIP SALUD S.A. (MEDISALUD)",
+    "101 - SERVE SALUD (O.S.P.D.I.C.Y)",
+    "121 - SWISS MEDICAL S.A.",
+    "135 - JERARQUICOS SALUD",
+    "140 - LUIS PASTEUR",
+    "172 - RED DE SEGURO MEDICO S.R.L.",
+    "186 - BOREAL - COBERTURA DE SALUD S.A.",
+    "196 - GALENO ARGENTINA S.A.",
+    "199 - O.S DE VIAJANTES VENDEDORES RA",
+    "200 - ASOCIACION MUTUAL SANCOR SALUD",
+    "206 - UNION PERSONAL",
+    "213 - UNIMED S.A.",
+    "233 - PREVENCION SALUD S.A.",
+    "237 - OSPE - OBRA SOCIAL DE PETROLEROS",
+    "631 - SANCOR SALUD - PLANES 800",
+    "632 - OSPSA - OBRA SOCIAL DEL PERSONAL DE LA SANIDAD ARGENTINA",
+    "635 - HOSPITAL DE DIA PLENIA S.R.L. (AVERA)",
+    "639 - OSDEPYM",
+    "641 - ITER MEDICINA S.A.",
+    "642 - FEDERADA SALUD",
+    "643 - NOBIS S.A.",
+    "644 - OSSACRA",
+    "645 - PICO - DISERIO Y ASOC. S.R.L. (HIGEA SALUD)",
+    "650 - BRAMED S.R.L.",
+    "654 - OSPATCA",
+    "655 - OSSEG"
+];
+
+let cachedObrasSociales = null;
+
+/**
+ * Obtiene las obras sociales registradas en SALUS
+ */
+export async function fetchSalusObrasSociales() {
+    if (cachedObrasSociales && cachedObrasSociales.length > 0) {
+        return cachedObrasSociales;
+    }
+
+    try {
+        const [res1, res2] = await Promise.all([
+            supabase.from('visitas_chequeo').select('obra_social').not('obra_social', 'is', null).limit(10000),
+            supabase.from('recepciones_visitas').select('obra_social').not('obra_social', 'is', null).limit(10000)
+        ]);
+
+        const set = new Set(DEFAULT_SALUS_OBRAS_SOCIALES);
+        (res1.data || []).forEach(r => r.obra_social && set.add(r.obra_social.trim()));
+        (res2.data || []).forEach(r => r.obra_social && set.add(r.obra_social.trim()));
+
+        // Filtrar las que comiencen con código numérico (convención SALUS)
+        const validList = [...set].filter(s => /^\d/.test(s)).sort((a, b) => {
+            if (a.startsWith('001')) return -1;
+            if (b.startsWith('001')) return 1;
+            return a.localeCompare(b);
+        });
+
+        cachedObrasSociales = validList;
+        return validList;
+    } catch (e) {
+        console.warn('Error fetching SALUS obras sociales from Supabase, using default list:', e);
+        return DEFAULT_SALUS_OBRAS_SOCIALES;
+    }
+}
+
 /**
  * Calcula la edad exacta en años a partir de una fecha de nacimiento YYYY-MM-DD
  * @param {string} birthDateStr - Fecha en formato 'YYYY-MM-DD'
@@ -121,6 +196,7 @@ export async function fetchPrevenirLeads({ dateFilter = 'all', search = '', limi
             (l.dni && l.dni.includes(s)) ||
             (l.telefono && l.telefono.includes(s)) ||
             (l.telefono_wa && l.telefono_wa.includes(s)) ||
+            (l.obra_social && l.obra_social.toLowerCase().includes(s)) ||
             (l.registrado_por && l.registrado_por.toLowerCase().includes(s))
         );
     }
