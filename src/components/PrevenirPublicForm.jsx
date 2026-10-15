@@ -61,6 +61,8 @@ export default function PrevenirPublicForm() {
     const [submitting, setSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState(null);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [registeredName, setRegisteredName] = useState('');
 
     // Today's leads counter & drawer
     const [todayLeads, setTodayLeads] = useState([]);
@@ -196,8 +198,11 @@ export default function PrevenirPublicForm() {
                 }
             }
 
-            // Notificación amigable
+            // Notificación amigable y modal con animación
             const primerNombre = nombre.trim().split(' ')[0];
+            setRegisteredName(primerNombre);
+            setShowSuccessModal(true);
+
             if (waStatus === 'enviado') {
                 setSuccessMessage(`¡Excelente! ${primerNombre} fue registrado y recibió el WhatsApp oficial de bienvenida.`);
             } else if (waStatus === 'error_wa') {
@@ -1041,6 +1046,114 @@ export default function PrevenirPublicForm() {
                                 ))
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Éxito con Animación Final */}
+            {showSuccessModal && (
+                <div
+                    onClick={() => {
+                        setShowSuccessModal(false);
+                        nombreInputRef.current?.focus();
+                    }}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(15, 23, 42, 0.75)',
+                        backdropFilter: 'blur(5px)',
+                        zIndex: 999999,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px',
+                        animation: 'fadeIn 0.25s ease-out'
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            background: '#ffffff',
+                            borderRadius: '24px',
+                            padding: '24px 20px',
+                            maxWidth: '360px',
+                            width: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            textAlign: 'center',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+                            position: 'relative'
+                        }}
+                    >
+                        {/* Animación GIF final */}
+                        <div style={{
+                            width: '260px',
+                            height: '220px',
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            background: '#f8fafc',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: '16px'
+                        }}>
+                            <img
+                                src="/animacion%20final.gif"
+                                alt="Registro completado"
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'contain'
+                                }}
+                            />
+                        </div>
+
+                        <div style={{
+                            fontSize: '1.25rem',
+                            fontWeight: 800,
+                            color: '#0f172a',
+                            marginBottom: '6px'
+                        }}>
+                            ¡Paciente Registrado!
+                        </div>
+
+                        <div style={{
+                            fontSize: '0.88rem',
+                            color: '#64748b',
+                            marginBottom: '18px',
+                            lineHeight: 1.4
+                        }}>
+                            {registeredName ? `${registeredName} fue registrado/a con éxito en el stand.` : 'Datos guardados correctamente.'}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowSuccessModal(false);
+                                setTimeout(() => nombreInputRef.current?.focus(), 150);
+                            }}
+                            style={{
+                                width: '100%',
+                                height: '48px',
+                                borderRadius: '12px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
+                                color: '#ffffff',
+                                fontSize: '0.94rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 14px rgba(29, 78, 216, 0.35)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            <span>Siguiente Paciente</span>
+                            <ChevronRight size={18} />
+                        </button>
                     </div>
                 </div>
             )}
