@@ -20,7 +20,6 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filterDate, setFilterDate] = useState('all'); // 'today' | 'all'
-    const [filterCaptador, setFilterCaptador] = useState('all');
     const [copiedLink, setCopiedLink] = useState(false);
     const [showQrModal, setShowQrModal] = useState(false);
     const [sendingId, setSendingId] = useState(null);
@@ -53,11 +52,7 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
         loadData();
     }, [loadData]);
 
-    // Filtrar por captador
-    const filteredLeads = useMemo(() => {
-        if (filterCaptador === 'all') return leads;
-        return leads.filter(l => l.registrado_por === filterCaptador);
-    }, [leads, filterCaptador]);
+    const filteredLeads = leads;
 
     // Métricas en tiempo real
     const metrics = useMemo(() => {
@@ -335,23 +330,6 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                             <option value="today">Solo los de Hoy</option>
                         </select>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>Captador:</span>
-                        <select
-                            value={filterCaptador}
-                            onChange={(e) => setFilterCaptador(e.target.value)}
-                            style={{
-                                height: '34px', padding: '0 8px', borderRadius: '6px',
-                                border: '1px solid #cbd5e1', fontSize: '0.8rem', background: '#fff',
-                                fontWeight: 600, color: '#334155', outline: 'none'
-                            }}
-                        >
-                            <option value="all">Todos</option>
-                            <option value="Gisela">Gisela</option>
-                            <option value="Pasante">Pasante</option>
-                        </select>
-                    </div>
                 </div>
             </div>
 
@@ -375,7 +353,6 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                                 <th style={{ padding: '12px 16px' }}>WhatsApp / Teléfono</th>
                                 <th style={{ padding: '12px 16px' }}>Obra Social</th>
                                 <th style={{ padding: '12px 16px' }}>Interés</th>
-                                <th style={{ padding: '12px 16px' }}>Captador / Fecha</th>
                                 <th style={{ padding: '12px 16px' }}>WhatsApp</th>
                                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Acciones</th>
                             </tr>
@@ -383,14 +360,14 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                                    <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
                                         <RefreshCw size={24} className="spin" style={{ margin: '0 auto 8px', display: 'block' }} />
                                         Cargando registros...
                                     </td>
                                 </tr>
                             ) : filteredLeads.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                                    <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
                                         No se encontraron registros con los filtros seleccionados.
                                     </td>
                                 </tr>
@@ -415,11 +392,9 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                                                 <div style={{ fontWeight: 700, color: '#0f172a' }}>
                                                     {lead.nombre_completo}
                                                 </div>
-                                                {lead.dni && (
-                                                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px' }}>
-                                                        DNI: {lead.dni}
-                                                    </div>
-                                                )}
+                                                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px' }}>
+                                                    {lead.dni ? `DNI: ${lead.dni} • ` : ''}{fechaFmt} a las {horaFmt}
+                                                </div>
                                                 {lead.observaciones && (
                                                     <div style={{ fontSize: '0.7rem', color: '#d97706', marginTop: '2px', fontStyle: 'italic' }}>
                                                         📝 {lead.observaciones}
@@ -485,16 +460,6 @@ export default function PrevenirAdminPanel({ addToast, onViewChange }) {
                                                 }}>
                                                     {lead.tipo_chequeo || 'Prevenir'}
                                                 </span>
-                                            </td>
-
-                                            {/* Captador / Fecha */}
-                                            <td style={{ padding: '12px 16px' }}>
-                                                <div style={{ fontWeight: 600, color: '#334155', fontSize: '0.78rem' }}>
-                                                    {lead.registrado_por || 'Stand OSP'}
-                                                </div>
-                                                <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                                                    {fechaFmt} a las {horaFmt}
-                                                </div>
                                             </td>
 
                                             {/* Estado WhatsApp */}
