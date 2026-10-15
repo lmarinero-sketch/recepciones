@@ -41,8 +41,6 @@ const CHEQUEO_OPTIONS = [
     },
 ];
 
-const CAPTADORES = ['Gisela', 'Pasante', 'Otro'];
-
 export default function PrevenirPublicForm() {
     // Form state
     const [nombre, setNombre] = useState('');
@@ -56,8 +54,6 @@ export default function PrevenirPublicForm() {
     const osDropdownRef = useRef(null);
     const osInputRef = useRef(null);
     const [tipoChequeo, setTipoChequeo] = useState('Prevenir');
-    const [registradoPor, setRegistradoPor] = useState(() => localStorage.getItem('prevenir_captador') || 'Gisela');
-    const [otroCaptador, setOtroCaptador] = useState('');
     const [observaciones, setObservaciones] = useState('');
     const [autoSendWhatsapp, setAutoSendWhatsapp] = useState(true);
 
@@ -103,12 +99,6 @@ export default function PrevenirPublicForm() {
         const s = osSearch.toLowerCase().trim();
         return obrasSocialesList.filter(os => os.toLowerCase().includes(s));
     }, [obrasSocialesList, osSearch]);
-
-    // Guardar captador en localStorage
-    const handleCaptadorChange = (val) => {
-        setRegistradoPor(val);
-        localStorage.setItem('prevenir_captador', val);
-    };
 
     // Cálculo dinámico de edad en tiempo real
     const computedAge = useMemo(() => {
@@ -164,7 +154,6 @@ export default function PrevenirPublicForm() {
         }
 
         setSubmitting(true);
-        const captadorFinal = registradoPor === 'Otro' ? (otroCaptador.trim() || 'Otro') : registradoPor;
 
         try {
             // 1. Guardar en Supabase
@@ -177,7 +166,7 @@ export default function PrevenirPublicForm() {
                 obra_social: obraSocial,
                 tipo_chequeo: tipoChequeo,
                 lugar_captacion: 'Obra Social Provincia',
-                registrado_por: captadorFinal,
+                registrado_por: 'Stand OSP',
                 observaciones: observaciones,
             });
 
@@ -794,56 +783,7 @@ export default function PrevenirPublicForm() {
                     </div>
                 </div>
 
-                {/* Registrado por (Gisela / Pasante) */}
-                <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                        Entrevistado por
-                    </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        {CAPTADORES.map(cap => {
-                            const isSel = registradoPor === cap;
-                            return (
-                                <button
-                                    type="button"
-                                    key={cap}
-                                    onClick={() => handleCaptadorChange(cap)}
-                                    style={{
-                                        flex: 1,
-                                        padding: '8px 10px',
-                                        borderRadius: '8px',
-                                        border: isSel ? '1.5px solid #1d4ed8' : '1px solid #cbd5e1',
-                                        background: isSel ? '#1d4ed8' : '#ffffff',
-                                        color: isSel ? '#ffffff' : '#334155',
-                                        fontSize: '0.8rem',
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        transition: 'all 0.15s'
-                                    }}
-                                >
-                                    {cap}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    {registradoPor === 'Otro' && (
-                        <input
-                            type="text"
-                            placeholder="Nombre del captador..."
-                            value={otroCaptador}
-                            onChange={(e) => setOtroCaptador(e.target.value)}
-                            style={{
-                                marginTop: '6px',
-                                width: '100%',
-                                boxSizing: 'border-box',
-                                height: '40px',
-                                padding: '8px 12px',
-                                fontSize: '0.85rem',
-                                borderRadius: '8px',
-                                border: '1px solid #cbd5e1'
-                            }}
-                        />
-                    )}
-                </div>
+
 
                 {/* Observaciones opcionales */}
                 <div>
