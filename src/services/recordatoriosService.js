@@ -21,9 +21,17 @@ const PAGE_SIZE = 1000;
 function filtrarPorTipoAgenda(rows, tipoAgendaFilter) {
     // Si no hay filtro o es 'todos', devolver todo (la tabla ya está pre-filtrada por el sync)
     if (!tipoAgendaFilter || tipoAgendaFilter === 'todos') return rows;
+    const filter = tipoAgendaFilter.toUpperCase().trim();
+    if (filter === 'CHEQUEO' || filter === 'CHQ') {
+        return rows.filter(r => {
+            const ta = (r.tipo_agenda || '').toUpperCase();
+            const tv = (r.tipo_visita || '').toUpperCase();
+            return ta.includes('CHQ') || ta.includes('CHEQUEO') || tv.includes('CHQ') || tv.includes('CHEQUEO');
+        });
+    }
     return rows.filter(r => {
         if (!r.tipo_agenda) return false;
-        return r.tipo_agenda.toUpperCase().trim() === tipoAgendaFilter.toUpperCase();
+        return r.tipo_agenda.toUpperCase().trim() === filter;
     });
 }
 
@@ -170,9 +178,61 @@ export async function fetchRecordatoriosObrasSociales() {
     return [];
 }
 
+function calcAgeFromBirthDate(bdStr) {
+    if (!bdStr) return null;
+    let d, m, y;
+    if (typeof bdStr === 'string') {
+        if (bdStr.includes('/')) {
+            const parts = bdStr.split('/');
+            if (parts.length === 3) {
+                d = parseInt(parts[0], 10);
+                m = parseInt(parts[1], 10) - 1;
+                y = parseInt(parts[2], 10);
+            }
+        } else if (bdStr.includes('-')) {
+            const parts = bdStr.split('-');
+            if (parts.length === 3) {
+                y = parseInt(parts[0], 10);
+                m = parseInt(parts[1], 10) - 1;
+                d = parseInt(parts[2], 10);
+            }
+        }
+    } else if (bdStr instanceof Date) {
+        y = bdStr.getFullYear();
+        m = bdStr.getMonth();
+        d = bdStr.getDate();
+    }
+    if (!y || isNaN(y) || isNaN(m) || isNaN(d)) return null;
+    const today = new Date();
+    let age = today.getFullYear() - y;
+    const monthDiff = today.getMonth() - m;
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d)) age--;
+    return (age >= 0 && age <= 120) ? age : null;
+}
+
+async function persistEdadesInBackground(toPersist) {
+    try {
+        const idsByAge = new Map();
+        for (const item of toPersist) {
+            if (!idsByAge.has(item.edad)) idsByAge.set(item.edad, []);
+            idsByAge.get(item.edad).push(item.id);
+        }
+        for (const [age, ids] of idsByAge.entries()) {
+            const CHUNK = 200;
+            for (let i = 0; i < ids.length; i += CHUNK) {
+                const chunk = ids.slice(i, i + CHUNK);
+                await supabase.from('recepciones_visitas').update({ edad: age }).in('id', chunk);
+            }
+        }
+    } catch (e) {
+        console.warn('Persistencia en background de edades (no crítico):', e);
+    }
+}
+
 /**
  * Obtiene TODOS los datos de recepciones_visitas para métricas.
  * Aplica regla de negocio: si asistencia es null y fecha < hoy → Ausente.
+ * Si faltan edades en los turnos, las resuelve automáticamente contra hospital_pacientes.
  */
 export async function fetchRecordatoriosMetrics(onProgress) {
     onProgress?.('Descargando turnos de chequeos...');
@@ -185,6 +245,56 @@ export async function fetchRecordatoriosMetrics(onProgress) {
             .order('fecha', { ascending: true })
             .range(from, to)
     );
+
+    // Enriquecimiento de edades faltantes
+    const missingDnis = [...new Set(
+        data.filter(r => (r.edad === null || r.edad === undefined || r.edad === '') && r.dni)
+            .map(r => r.dni.toString().trim())
+    )];
+
+    if (missingDnis.length > 0) {
+        onProgress?.(`Enriqueciendo edades (${missingDnis.length} pacientes)...`);
+        const ageByDni = new Map();
+        const CHUNK = 150;
+        for (let i = 0; i < missingDnis.length; i += CHUNK) {
+            const chunk = missingDnis.slice(i, i + CHUNK);
+            const { data: pacs } = await supabase
+                .from('hospital_pacientes')
+                .select('dni, edad, fecha_nacimiento')
+                .in('dni', chunk);
+
+            pacs?.forEach(p => {
+                if (p.dni) {
+                    const cd = p.dni.toString().trim();
+                    let age = null;
+                    if (p.edad !== null && p.edad !== undefined && p.edad !== '') {
+                        const num = parseInt(p.edad, 10);
+                        if (!isNaN(num) && num >= 0 && num <= 120) age = num;
+                    }
+                    if (age === null && p.fecha_nacimiento) {
+                        age = calcAgeFromBirthDate(p.fecha_nacimiento);
+                    }
+                    if (age !== null) ageByDni.set(cd, age);
+                }
+            });
+        }
+
+        const toPersist = [];
+        data.forEach(row => {
+            if ((row.edad === null || row.edad === undefined || row.edad === '') && row.dni) {
+                const cd = row.dni.toString().trim();
+                if (ageByDni.has(cd)) {
+                    const resolvedAge = ageByDni.get(cd);
+                    row.edad = resolvedAge;
+                    if (row.id) toPersist.push({ id: row.id, edad: resolvedAge });
+                }
+            }
+        });
+
+        if (toPersist.length > 0) {
+            persistEdadesInBackground(toPersist);
+        }
+    }
 
     onProgress?.(`Procesando ${data.length} chequeos...`);
 

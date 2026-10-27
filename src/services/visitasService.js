@@ -465,8 +465,23 @@ export async function fetchPacientesConAsistencia(options = {}, onProgress = nul
 export async function fetchEncuestasPreventivos() {
     const { data } = await supabase
         .from('encuestas_preventivos')
-        .select('telefono, estado');
+        .select('telefono, estado, created_at, updated_at');
     return data || [];
+}
+
+/**
+ * Dispara manualmente la ejecución del cron de encuestas (Edge Function).
+ * @param {Object} [params] - { daysBack, limit }
+ */
+export async function triggerCronEncuestas(params = {}) {
+    const { data, error } = await supabase.functions.invoke('cron-encuestas', {
+        body: params
+    });
+    if (error) {
+        console.error('Error invocando cron-encuestas:', error);
+        throw error;
+    }
+    return data;
 }
 
 /**

@@ -3,10 +3,10 @@ import {
     Search, Users, Calendar, Phone, Send, X, RefreshCw,
     MessageSquare, UserCheck, AlertCircle, Loader2,
     CheckCircle2, ClipboardCheck, Building2, ChevronDown,
-    Star, Clock, Mail, MailCheck
+    Star, Clock, Mail, MailCheck, Zap
 } from 'lucide-react';
 import { fetchPacientesPresentes, fetchRecordatoriosObrasSociales } from '../services/recordatoriosService';
-import { fetchEncuestasPreventivos, crearEncuestaPreventivo } from '../services/visitasService';
+import { fetchEncuestasPreventivos, crearEncuestaPreventivo, triggerCronEncuestas } from '../services/visitasService';
 import { sendMetaTemplate, fetchMetaTemplates } from '../services/metaTemplateService';
 import { normalizeArgentinePhone } from '../services/builderbotApi';
 import { saveOutgoingMessage } from '../services/chatService';
@@ -66,6 +66,7 @@ export default function EncuestaCalidadPanel({ addToast }) {
 
     // Sending state
     const [sendingTo, setSendingTo] = useState(null);
+    const [runningCron, setRunningCron] = useState(false);
 
     // Bulk
     const [bulkSelectionMode, setBulkSelectionMode] = useState(false);
@@ -137,7 +138,22 @@ export default function EncuestaCalidadPanel({ addToast }) {
             ]);
             setLoadProgress('');
             setPacientes(data);
-            const sentPhonesSet = new Set(encuestasDB.map(e => e.telefono));
+
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            // Considerar enviadas aquellas encuestas asociadas al mes seleccionado o recientes (30 días)
+            // para evitar que registros viejos de prueba bloqueen pacientes actuales
+            const sentPhonesSet = new Set();
+            encuestasDB.forEach(e => {
+                if (!e.telefono) return;
+                const createdAt = e.created_at ? e.created_at.substring(0, 10) : '';
+                const isSelectedMonth = createdAt && createdAt >= fechaDesde && createdAt <= fechaHasta;
+                const isRecent = e.created_at && (new Date(e.created_at) >= thirtyDaysAgo);
+                if (isSelectedMonth || isRecent) {
+                    sentPhonesSet.add(e.telefono);
+                }
+            });
             setSentPhones(sentPhonesSet);
         } catch (e) {
             console.error(e);
@@ -234,6 +250,30 @@ export default function EncuestaCalidadPanel({ addToast }) {
             setSendingTo(null);
         }
     }, [encuestaTemplate, addToast, sentPhones]);
+
+    // Run Automated Cron Dispatch
+    const handleRunCron = useCallback(async () => {
+        setRunningCron(true);
+        try {
+            addToast?.('Ejecutando envío automático diario...', 'info');
+            const res = await triggerCronEncuestas({ daysBack: 2 });
+            if (res?.ok) {
+                if (res.sentCount > 0) {
+                    addToast?.(`✅ Proceso finalizado: ${res.sentCount} encuestas enviadas exitosamente`, 'success');
+                } else {
+                    addToast?.(`ℹ️ No se encontraron pacientes nuevos pendientes de envío hoy`, 'info');
+                }
+                await loadData();
+            } else {
+                addToast?.(`Aviso: ${res?.message || 'Sin envíos realizados'}`, 'warning');
+            }
+        } catch (err) {
+            console.error('Error ejecutando cron de encuestas:', err);
+            addToast?.(`Error en envío automático: ${err.message}`, 'error');
+        } finally {
+            setRunningCron(false);
+        }
+    }, [addToast, loadData]);
 
     // Bulk send
     const handleBulkStart = useCallback(() => {
@@ -412,6 +452,23 @@ export default function EncuestaCalidadPanel({ addToast }) {
                             {bulkSelectionMode
                                 ? `Enviar Encuesta (${selectedForBulk.length})`
                                 : 'Enviar a Todos'}
+                        </button>
+                        <button
+                            onClick={handleRunCron}
+                            disabled={loading || runningCron}
+                            title="Dispara el envío automático de encuestas para los pacientes que asistieron recientemente (hoy y ayer)"
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px',
+                                background: runningCron ? '#cbd5e1' : 'linear-gradient(135deg, #0284c7, #0369a1)',
+                                border: 'none', borderRadius: '8px',
+                                cursor: runningCron ? 'default' : 'pointer',
+                                fontSize: '0.8rem', color: '#fff', fontWeight: 700,
+                                transition: 'all .15s', opacity: loading ? 0.5 : 1,
+                                boxShadow: runningCron ? 'none' : '0 2px 8px rgba(2,132,199,.25)',
+                            }}
+                        >
+                            {runningCron ? <Loader2 size={14} className="spin" /> : <Zap size={14} />}
+                            {runningCron ? 'Ejecutando...' : 'Envío Automático'}
                         </button>
                         <button onClick={loadData} disabled={loading} style={{
                             display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px',

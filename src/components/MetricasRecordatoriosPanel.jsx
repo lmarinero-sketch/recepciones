@@ -50,11 +50,12 @@ function StatCard({ icon: Icon, label, value, sub, color, bg }) {
     );
 }
 
-function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
+function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos', customMin = '', customMax = '') {
     const byMonth = {};
     const osCounts = {};
     const medicoCounts = {};
     const ageCounts = {
+        '< 14': 0,
         '14 - 17': 0,
         '18 - 50': 0,
         '51 - 65': 0,
@@ -75,10 +76,17 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
         if (filtroEdad !== 'todos') {
             const age = r.edad !== null && r.edad !== undefined && r.edad !== '' ? parseInt(r.edad, 10) : null;
             if (age === null || isNaN(age)) return;
+            if (filtroEdad === '<14' && age >= 14) return;
             if (filtroEdad === '14-17' && (age < 14 || age > 17)) return;
             if (filtroEdad === '18-50' && (age < 18 || age > 50)) return;
             if (filtroEdad === '51-65' && (age < 51 || age > 65)) return;
             if (filtroEdad === '66+' && age < 66) return;
+            if (filtroEdad === 'custom') {
+                const min = customMin !== '' ? parseInt(customMin, 10) : null;
+                const max = customMax !== '' ? parseInt(customMax, 10) : null;
+                if (min !== null && !isNaN(min) && age < min) return;
+                if (max !== null && !isNaN(max) && age > max) return;
+            }
         }
 
         const key = `${r.dni || r.paciente}_${r.fecha}`;
@@ -119,11 +127,12 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
                 medicoCounts[r.medico] = (medicoCounts[r.medico] || 0) + 1;
             }
 
-            // Conteo por rango etario (Solo pacientes con Asistencia Presente, excluyendo menores de 14 años por especificación médica)
+            // Conteo por rango etario (Solo pacientes con Asistencia Presente)
             if (r.edad !== null && r.edad !== undefined && r.edad !== '') {
                 const age = parseInt(r.edad, 10);
                 if (!isNaN(age)) {
-                    if (age >= 14 && age <= 17) ageCounts['14 - 17']++;
+                    if (age < 14) ageCounts['< 14']++;
+                    else if (age >= 14 && age <= 17) ageCounts['14 - 17']++;
                     else if (age >= 18 && age <= 50) ageCounts['18 - 50']++;
                     else if (age >= 51 && age <= 65) ageCounts['51 - 65']++;
                     else if (age >= 66) ageCounts['66+']++;
@@ -155,6 +164,7 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     const topMedicos = Object.entries(medicoCounts).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
 
     const AGE_COLORS = {
+        '< 14': '#06b6d4',
         '14 - 17': '#3b82f6',
         '18 - 50': '#10b981',
         '51 - 65': '#f59e0b',
@@ -172,7 +182,7 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos') {
     return { months, topOS, topMedicos, ageDistribution, totalPresentes, totalAusentes, totalPendientes, total: filteredCount, tasaGlobal };
 }
 
-function aggregateYoY(data, modo = 'agendados') {
+function aggregateYoY(data, modo = 'agendados', filtroEdad = 'todos', customMin = '', customMax = '') {
     const byMonth = {};
     const uniqueVisitsMap = new Map();
     
@@ -197,6 +207,23 @@ function aggregateYoY(data, modo = 'agendados') {
 
         if (modo === 'asistidos' && asis !== 'Presente') return;
         if (modo === 'ausentes' && !isAusente) return;
+
+        // Filtro por rango etario si aplica
+        if (filtroEdad !== 'todos') {
+            const age = r.edad !== null && r.edad !== undefined && r.edad !== '' ? parseInt(r.edad, 10) : null;
+            if (age === null || isNaN(age)) return;
+            if (filtroEdad === '<14' && age >= 14) return;
+            if (filtroEdad === '14-17' && (age < 14 || age > 17)) return;
+            if (filtroEdad === '18-50' && (age < 18 || age > 50)) return;
+            if (filtroEdad === '51-65' && (age < 51 || age > 65)) return;
+            if (filtroEdad === '66+' && age < 66) return;
+            if (filtroEdad === 'custom') {
+                const min = customMin !== '' ? parseInt(customMin, 10) : null;
+                const max = customMax !== '' ? parseInt(customMax, 10) : null;
+                if (min !== null && !isNaN(min) && age < min) return;
+                if (max !== null && !isNaN(max) && age > max) return;
+            }
+        }
 
         const [y, mo] = r.fecha.split('-');
         const monthIndex = parseInt(mo, 10) - 1;
@@ -229,6 +256,8 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
     const [fechaDesde, setFechaDesde] = useState(defaultDates.fechaDesde);
     const [fechaHasta, setFechaHasta] = useState(defaultDates.fechaHasta);
     const [filtroEdad, setFiltroEdad] = useState('todos');
+    const [customEdadMin, setCustomEdadMin] = useState('');
+    const [customEdadMax, setCustomEdadMax] = useState('');
     const [yoyMode, setYoyMode] = useState('agendados'); // agendados | asistidos | ausentes
 
     const loadData = useCallback(async () => {
@@ -254,8 +283,14 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
         return [...ys].sort().reverse();
     }, [rawData]);
 
-    const agg = useMemo(() => aggregate(rawData, fechaDesde, fechaHasta, filtroEdad), [rawData, fechaDesde, fechaHasta, filtroEdad]);
-    const yoyData = useMemo(() => aggregateYoY(rawData, yoyMode), [rawData, yoyMode]); // YoY con filtro por estado
+    const agg = useMemo(
+        () => aggregate(rawData, fechaDesde, fechaHasta, filtroEdad, customEdadMin, customEdadMax),
+        [rawData, fechaDesde, fechaHasta, filtroEdad, customEdadMin, customEdadMax]
+    );
+    const yoyData = useMemo(
+        () => aggregateYoY(rawData, yoyMode, filtroEdad, customEdadMin, customEdadMax),
+        [rawData, yoyMode, filtroEdad, customEdadMin, customEdadMax]
+    );
     
     const avgAgendados = useMemo(() => {
         return agg.months.length > 0 ? Math.round(agg.total / agg.months.length) : 0;
@@ -317,23 +352,52 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                             color: '#1e293b', fontSize: '0.8rem', background: '#fff', fontWeight: 600, cursor: 'pointer'
                         }}
                     >
-                        <option value="todos">Todos los rangos (≥ 14 años)</option>
+                        <option value="todos">Todos los rangos</option>
                         <option value="14-17">14 - 17 años (Adolescentes)</option>
                         <option value="18-50">18 - 50 años (Adultos Jóvenes)</option>
                         <option value="51-65">51 - 65 años (Adultos)</option>
                         <option value="66+">66 en adelante (66+ años)</option>
+                        <option value="<14">Menores de 14 años (&lt; 14)</option>
+                        <option value="custom">Personalizado (Rango a medida)...</option>
                     </select>
                 </div>
+                {filtroEdad === 'custom' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '4px 10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>De:</span>
+                        <input
+                            type="number"
+                            min="0"
+                            max="120"
+                            placeholder="Min"
+                            value={customEdadMin}
+                            onChange={e => setCustomEdadMin(e.target.value)}
+                            style={{ width: '55px', padding: '4px 6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', textAlign: 'center', background: '#fff' }}
+                        />
+                        <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>a:</span>
+                        <input
+                            type="number"
+                            min="0"
+                            max="120"
+                            placeholder="Max"
+                            value={customEdadMax}
+                            onChange={e => setCustomEdadMax(e.target.value)}
+                            style={{ width: '55px', padding: '4px 6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', textAlign: 'center', background: '#fff' }}
+                        />
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>años</span>
+                    </div>
+                )}
                 <button onClick={() => {
                     const prev = getPreviousMonthRange();
                     setFechaDesde(prev.fechaDesde);
                     setFechaHasta(prev.fechaHasta);
                     setFiltroEdad('todos');
+                    setCustomEdadMin('');
+                    setCustomEdadMax('');
                 }} style={{
                     padding: '6px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
                 }}>Mes anterior (Por defecto)</button>
-                {(fechaDesde || fechaHasta || filtroEdad !== 'todos') && (
-                    <button onClick={() => { setFechaDesde(''); setFechaHasta(''); setFiltroEdad('todos'); }} style={{
+                {(fechaDesde || fechaHasta || filtroEdad !== 'todos' || customEdadMin || customEdadMax) && (
+                    <button onClick={() => { setFechaDesde(''); setFechaHasta(''); setFiltroEdad('todos'); setCustomEdadMin(''); setCustomEdadMax(''); }} style={{
                         padding: '6px 12px', borderRadius: '8px', border: 'none', background: '#fef2f2', color: '#ef4444', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
                     }}>Ver todo / Limpiar</button>
                 )}
