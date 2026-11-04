@@ -3,7 +3,12 @@ import { v4 as uuidv4 } from 'uuid';
 import Sidebar from './components/Sidebar.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
 import ChangePasswordModal from './components/ChangePasswordModal.jsx';
-import { getCurrentUser, logout as authLogout } from './services/authService';
+import {
+    getCurrentUser,
+    logout as authLogout,
+    ensureBackendSession,
+    heartbeatBackendSession,
+} from './services/authService';
 import { logAction } from './services/auditService';
 import { subscribeToAllIncoming, fetchUnreadCounts } from './services/chatService';
 import { LogOut, KeyRound, Menu } from 'lucide-react';
@@ -31,19 +36,51 @@ import './App.css';
 
 function AppRoot() {
     const [currentUser, setCurrentUser] = useState(() => getCurrentUser());
+    const [sessionSynced, setSessionSynced] = useState(false);
+
+    useEffect(() => {
+        let active = true;
+        if (!currentUser) {
+            setSessionSynced(false);
+            return;
+        }
+        ensureBackendSession(currentUser).then((ok) => {
+            if (!active) return;
+            if (!ok) {
+                authLogout();
+                setCurrentUser(null);
+                setSessionSynced(false);
+            } else {
+                setSessionSynced(true);
+            }
+        });
+        const interval = setInterval(() => {
+            heartbeatBackendSession(currentUser);
+        }, 45000);
+        return () => {
+            active = false;
+            clearInterval(interval);
+        };
+    }, [currentUser]);
 
     const handleLogin = useCallback((user) => {
+        setSessionSynced(true);
         setCurrentUser(user);
     }, []);
 
     const handleLogout = useCallback(async () => {
         await logAction('logout', { usuario: currentUser?.usuario });
         authLogout();
+        setSessionSynced(false);
         setCurrentUser(null);
     }, [currentUser]);
 
     if (!currentUser) {
         return <LoginScreen onLogin={handleLogin} />;
+    }
+
+    if (!sessionSynced) {
+        return null;
     }
 
     return <App currentUser={currentUser} onLogout={handleLogout} />;
@@ -338,4 +375,3 @@ function App({ currentUser, onLogout }) {
 }
 
 export default AppRoot;
-

@@ -2,10 +2,15 @@
  * Servicio de Autenticación
  * 
  * Login/logout con verificación de password via Supabase RPC (pgcrypto).
- * Sesión persistida en localStorage.
- * Máximo ~10 usuarios, todos con mismo rol.
+ * Sesión persistida en localStorage y sincronizada con admqui_usuarios (x-session-token / x-device-token).
  */
-import { supabase } from '../lib/supabase';
+import {
+    supabase,
+    getOrCreateSessionToken,
+    getOrCreateDeviceToken,
+    setSessionToken,
+    clearSessionToken,
+} from '../lib/supabase';
 import { trackLogin, trackLogout } from '../lib/hubTracker';
 
 const SESSION_KEY = 'admqui_session';
@@ -36,6 +41,61 @@ export function getCurrentUser() {
  */
 export function isAuthenticated() {
     return getCurrentUser() !== null;
+}
+
+/**
+ * Registra o sincroniza el token de sesión del usuario activo en admqui_usuarios
+ * para que las políticas RLS (is_valid_admqui_session) autoricen las consultas de ese usuario.
+ */
+export async function ensureBackendSession(user) {
+    if (!user?.id) return false;
+    try {
+        const sessionToken = getOrCreateSessionToken();
+        const deviceToken = getOrCreateDeviceToken();
+
+        const { data, error } = await supabase.rpc('check_or_claim_user_session', {
+            p_user_id: user.id,
+            p_session_token: sessionToken,
+            p_device_token: deviceToken,
+            p_device_label: 'Recepciones Web',
+            p_force_takeover: true,
+        });
+
+        if (!error && data?.status === 'ok') {
+            if (data.session_token) {
+                setSessionToken(data.session_token);
+            }
+            return true;
+        }
+        return false;
+    } catch (err) {
+        console.warn('[AuthService] No se pudo sincronizar token de sesión:', err);
+        return false;
+    }
+}
+
+/**
+ * Envía heartbeat periódico para mantener viva la sesión en admqui_usuarios
+ */
+export async function heartbeatBackendSession(user) {
+    if (!user?.id) return;
+    try {
+        const sessionToken = getOrCreateSessionToken();
+        const deviceToken = getOrCreateDeviceToken();
+
+        const { data, error } = await supabase.rpc('heartbeat_and_verify_user_session', {
+            p_user_id: user.id,
+            p_session_token: sessionToken,
+            p_device_token: deviceToken,
+            p_device_label: 'Recepciones Web',
+        });
+
+        if (!error && data?.session_token) {
+            setSessionToken(data.session_token);
+        }
+    } catch {
+        // Non-blocking heartbeat
+    }
 }
 
 
@@ -86,6 +146,9 @@ export async function login(usuario, password) {
 
         localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 
+        // Registrar token de sesión en admqui_usuarios antes de continuar
+        await ensureBackendSession(session);
+
         // Track in Hub Monitor (non-blocking)
         trackLogin(supabase, user.usuario);
 
@@ -103,6 +166,7 @@ export function logout() {
     const user = getCurrentUser();
     if (user) trackLogout(supabase, user.usuario);
     localStorage.removeItem(SESSION_KEY);
+    clearSessionToken();
 }
 
 

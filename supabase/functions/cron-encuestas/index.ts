@@ -17,10 +17,24 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 // La línea de WhatsApp predeterminada para el envío
 const DEFAULT_LINE_ID = 'line_recepciones';
 
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-session-token, x-device-token',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 Deno.serve(async (req) => {
+    // Manejar preflight CORS desde el navegador
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders });
+    }
+
     // Verificar que sea POST
     if (req.method !== 'POST') {
-        return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
     }
 
     try {
@@ -55,14 +69,17 @@ Deno.serve(async (req) => {
             .gte('fecha', startDate)
             .lte('fecha', endDate)
             .eq('asistencia', 'Presente')
-            .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
+            .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%,tipo_visita.ilike.%CHEQUEO%,tipo_agenda.ilike.%CHEQUEO%')
             .not('telefono1', 'is', null)
             .order('fecha', { ascending: true });
 
         if (fetchError) throw fetchError;
         if (!visitas || visitas.length === 0) {
             console.log(`[cron-encuestas] No hay pacientes para enviar la encuesta en el rango seleccionado.`);
-            return new Response(JSON.stringify({ ok: true, sentCount: 0, message: 'No hay pacientes pendientes en el rango' }), { status: 200 });
+            return new Response(JSON.stringify({ ok: true, sentCount: 0, message: 'No hay pacientes pendientes en el rango' }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
         }
 
         // Extraer teléfonos únicos y el primer nombre del paciente
@@ -158,7 +175,7 @@ Deno.serve(async (req) => {
                     sentCount++;
 
                     // Registrar el envío en el chat para visibilidad del operador
-                    await supabase.from('whatsapp_messages').insert({
+                    const { error: logErr } = await supabase.from('whatsapp_messages').insert({
                         phone: patient.phone,
                         direction: 'outgoing',
                         content: `✅ [Envío Encuesta Satisfacción] Plantilla enviada a ${patient.name}`,
@@ -166,7 +183,10 @@ Deno.serve(async (req) => {
                         sender_name: 'Dora (Bot)',
                         is_read: true,
                         line_id: DEFAULT_LINE_ID
-                    }).catch(e => console.error('[cron-encuestas] Error logging message:', e));
+                    });
+                    if (logErr) {
+                        console.error('[cron-encuestas] Error logging message:', logErr);
+                    }
 
                 } else {
                     const errBody = await sendRes.text();
@@ -185,12 +205,15 @@ Deno.serve(async (req) => {
             totalFound: uniquePatients.length,
             targetWindow: { startDate, endDate } 
         }), {
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
         });
 
     } catch (error: any) {
         console.error('[cron-encuestas] Error general:', error);
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
     }
 });

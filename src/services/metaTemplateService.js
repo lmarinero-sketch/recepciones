@@ -44,9 +44,7 @@ export async function fetchMetaTemplates(forceRefresh = false) {
     }
 
     try {
-        const { apiKey, projectId } = await getRecepcionesCredentials();
-
-        // Usar la Edge Function como proxy server-side para evitar CORS
+        // Usar la Edge Function como proxy server-side (no requiere leer credenciales en el cliente)
         const { data, error } = await supabase.functions.invoke('send-whatsapp', {
             body: {
                 action: 'list_templates',
@@ -57,6 +55,7 @@ export async function fetchMetaTemplates(forceRefresh = false) {
         if (error) {
             console.error('Edge Function error:', error);
             // Fallback: intentar fetch directo (funciona si no hay CORS o en dev)
+            const { apiKey, projectId } = await getRecepcionesCredentials();
             return await fetchMetaTemplatesDirect(apiKey, projectId);
         }
 
