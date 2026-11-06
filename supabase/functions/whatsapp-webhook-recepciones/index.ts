@@ -195,6 +195,26 @@ Deno.serve(async (req) => {
                 data.message?.videoMessage?.caption || '';
         }
 
+        // Filtrar mensajes sintéticos placeholder de BuilderBot Cloud / Meta Cloud API
+        // ("\uFEFFMmm, entiendo. Continúa." / "\uFEFFHmm, I see. Go on.")
+        // Se disparan cuando el paciente envía un álbum de múltiples fotos (contenedor albumMessage)
+        // o una reacción / evento sin cuerpo de texto estándar en Meta Cloud API.
+        const isSyntheticBuilderBotPlaceholder =
+            typeof content === 'string' &&
+            !mediaUrl &&
+            (
+                content.charCodeAt(0) === 0xFEFF ||
+                /^\uFEFF?\s*(mmm,\s*entiendo\.\s*contin[uú]a\.|hmm,\s*i\s*see\.\s*go\s*on\.)\s*$/i.test(content)
+            );
+
+        if (isSyntheticBuilderBotPlaceholder) {
+            console.log(`[webhook] ⏭️ Ignorando placeholder sintético de BuilderBot (${JSON.stringify(content)}) de ${phone} en ${lineId}`);
+            return new Response(
+                JSON.stringify({ ok: true, skipped: true, reason: 'builderbot_synthetic_placeholder', phone, lineId }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
         // =============================================
         // PERSISTIR MEDIA EN SUPABASE STORAGE
         // Descarga el archivo temporal y lo sube al bucket
@@ -599,7 +619,7 @@ async function handleSurveyFlow(supabase: any, phone: string, content: string, l
         }).catch(e => console.error('[survey] Error sending msg:', e));
 
         // Registrar el mensaje saliente del bot en la base de datos para que sea visible en la interfaz
-        await supabase.from('whatsapp_messages').insert({
+        const { error: logErr } = await supabase.from('whatsapp_messages').insert({
             phone: phone,
             direction: 'outgoing',
             content: msg,
@@ -607,7 +627,8 @@ async function handleSurveyFlow(supabase: any, phone: string, content: string, l
             sender_name: 'Dora (Bot)',
             is_read: true,
             line_id: lineId
-        }).catch((e: any) => console.error('[survey] Error logging msg:', e));
+        });
+        if (logErr) console.error('[survey] Error logging msg:', logErr);
     };
 
     try {
