@@ -293,15 +293,16 @@ export async function updateAsistencia(id, asistencia) {
 
 /**
  * Fetch all CHQ visits for metrics aggregation (minimal fields).
- * Returns raw records for client-side aggregation.
+ * Combines live `recepciones_visitas` (2024-2026+ including CHEQUEO PREVENTIVO and CHEQUEO INFORME)
+ * with legacy `visitas_chequeo` for any older dates prior to 2024.
  */
 export async function fetchChequeoMetrics(onProgress = null) {
-    if (onProgress) onProgress('Cargando datos de chequeos...');
+    if (onProgress) onProgress('Cargando datos de chequeos e informes...');
 
-    const data = await paginateQuery((from, to) => {
+    const liveData = await paginateQuery((from, to) => {
         return supabase
-            .from('visitas_chequeo')
-            .select('fecha, dni, obra_social, centro, asistencia')
+            .from('recepciones_visitas')
+            .select('fecha, dni, paciente, obra_social, centro, asistencia, tipo_visita, tipo_agenda, medico')
             .or('tipo_visita.ilike.%CHQ%,tipo_agenda.ilike.%CHQ%')
             .not('fecha', 'is', null)
             .range(from, to);
@@ -309,7 +310,7 @@ export async function fetchChequeoMetrics(onProgress = null) {
         if (onProgress) onProgress(`Cargando... ${rows.toLocaleString()} registros`);
     });
 
-    return data;
+    return liveData;
 }
 
 /**
