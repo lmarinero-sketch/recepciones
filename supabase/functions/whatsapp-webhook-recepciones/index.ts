@@ -589,11 +589,15 @@ function findMediaUrl(obj, depth = 0) {
 // =============================================
 
 async function handleSurveyFlow(supabase: any, phone: string, content: string, lineId: string, mediaUrl: string | null): Promise<boolean> {
+    // 1. Solo considerar encuestas enviadas en las últimas 24 horas
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
     const { data: survey } = await supabase
         .from('encuestas_preventivos')
         .select('*')
         .eq('telefono', phone)
         .in('estado', ['INVITADO', 'Q1_PENDIENTE', 'Q2_PENDIENTE', 'Q3_PENDIENTE', 'CIERRE_PENDIENTE'])
+        .gte('created_at', twentyFourHoursAgo)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -601,6 +605,43 @@ async function handleSurveyFlow(supabase: any, phone: string, content: string, l
     if (!survey) return false;
 
     const text = (content || '').trim().toLowerCase();
+
+    // 2. Si el paciente toca un botón de recordatorio o marketing, NO es respuesta de encuesta
+    const isTemplateButton = [
+        'confirmo asistencia',
+        'necesito reprogramar',
+        'agendar turno',
+        'no estoy interesado',
+    ].includes(text);
+    if (isTemplateButton) {
+        return false;
+    }
+
+    // 3. Verificar si un operador humano de Recepciones intervino después de enviada la encuesta
+    const { data: humanMsgs } = await supabase
+        .from('whatsapp_messages')
+        .select('id, sender_name, content, created_at')
+        .eq('phone', phone)
+        .eq('line_id', lineId)
+        .eq('direction', 'outgoing')
+        .neq('sender_name', 'Dora (Bot)')
+        .gt('created_at', survey.created_at)
+        .limit(1);
+
+    if (humanMsgs && humanMsgs.length > 0) {
+        console.log(`[survey] ⏭️ Operador humano intervino en el chat de ${phone} tras la encuesta (${survey.id}). Desactivando bot de encuesta.`);
+        const nextState = survey.estado === 'CIERRE_PENDIENTE' ? 'COMPLETADA' : 'EXPIRADA';
+        await supabase.from('encuestas_preventivos').update({ estado: nextState }).eq('id', survey.id);
+        return false;
+    }
+
+    // 4. Si está en Q1, Q2 o Q3 y escribe un mensaje conversacional largo (> 12 caracteres)
+    // o palabras clave administrativas ("turno", "estudio", "analisis", "hola", "gracias"),
+    // no responder "Por favor, responde con A, B o C" para no interferir con consultas reales.
+    const isConversationalQuery =
+        text.length > 12 ||
+        /\b(turno|estudios?|analisis|análisis|laboratorio|informe|doctor|doctora|hola|buen|gracias|chequeo)\b/i.test(text);
+
     const sendMsg = async (msg: string) => {
         const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -634,41 +675,43 @@ async function handleSurveyFlow(supabase: any, phone: string, content: string, l
     try {
         if (survey.estado === 'INVITADO') {
             if (text === 'sí' || text === 'si' || text === 'sì') {
-                await supabase.from('encuestas_preventivos').update({ estado: 'Q1_PENDIENTE' }).eq('id', survey.id);
+                await supabase.from('encuestas_preventivos').update({ estado: 'Q1_PENDIENTE', updated_at: new Date().toISOString() }).eq('id', survey.id);
                 await sendMsg("1️⃣ Del 1 al 10, ¿qué tan probable es que recomiendes nuestros chequeos preventivos a un amigo o familiar? (Siendo 1 'nada probable' y 10 'muy probable').");
             } else if (text === 'no') {
-                await supabase.from('encuestas_preventivos').update({ estado: 'RECHAZADA' }).eq('id', survey.id);
+                await supabase.from('encuestas_preventivos').update({ estado: 'RECHAZADA', updated_at: new Date().toISOString() }).eq('id', survey.id);
                 await sendMsg("¡Gracias de todas formas! Que tengas un excelente día.");
             }
             return true;
         }
 
         if (survey.estado === 'Q1_PENDIENTE') {
-            const nps = parseInt(text);
-            if (!isNaN(nps) && nps >= 1 && nps <= 10) {
-                await supabase.from('encuestas_preventivos').update({ estado: 'Q2_PENDIENTE', q1_nps: nps }).eq('id', survey.id);
+            const nps = parseInt(text, 10);
+            if (!isNaN(nps) && nps >= 1 && nps <= 10 && /^\d{1,2}$/.test(text)) {
+                await supabase.from('encuestas_preventivos').update({ estado: 'Q2_PENDIENTE', q1_nps: nps, updated_at: new Date().toISOString() }).eq('id', survey.id);
                 await sendMsg("2️⃣ Durante el chequeo y la devolución de resultados, ¿sentiste que las explicaciones médicas fueron claras y te ayudaron a entender tu salud con información útil y basada en evidencia?\nA. Sí, todo fue muy claro.\nB. Entendí, pero me quedaron algunas dudas.\nC. No, sentí que faltó información o claridad.");
-            } else {
+            } else if (!isConversationalQuery) {
                 await sendMsg("Por favor, responde con un número del 1 al 10.");
             }
             return true;
         }
 
         if (survey.estado === 'Q2_PENDIENTE') {
-            if (['a', 'b', 'c'].includes(text)) {
-                await supabase.from('encuestas_preventivos').update({ estado: 'Q3_PENDIENTE', q2_claridad: text.toUpperCase() }).eq('id', survey.id);
+            const normOpt = text.replace(/[^a-z]/g, '');
+            if (['a', 'b', 'c'].includes(normOpt) && text.length <= 3) {
+                await supabase.from('encuestas_preventivos').update({ estado: 'Q3_PENDIENTE', q2_claridad: normOpt.toUpperCase(), updated_at: new Date().toISOString() }).eq('id', survey.id);
                 await sendMsg("3️⃣ ¿Cómo calificarías la agilidad, los tiempos de espera y la atención durante todo el circuito del chequeo?\nA. Excelente\nB. Buena\nC. Regular\nD. Mala");
-            } else {
+            } else if (!isConversationalQuery) {
                 await sendMsg("Por favor, responde con A, B o C.");
             }
             return true;
         }
 
         if (survey.estado === 'Q3_PENDIENTE') {
-            if (['a', 'b', 'c', 'd'].includes(text)) {
-                await supabase.from('encuestas_preventivos').update({ estado: 'CIERRE_PENDIENTE', q3_agilidad: text.toUpperCase() }).eq('id', survey.id);
+            const normOpt = text.replace(/[^a-z]/g, '');
+            if (['a', 'b', 'c', 'd'].includes(normOpt) && text.length <= 3) {
+                await supabase.from('encuestas_preventivos').update({ estado: 'CIERRE_PENDIENTE', q3_agilidad: normOpt.toUpperCase(), updated_at: new Date().toISOString() }).eq('id', survey.id);
                 await sendMsg("¡Mil gracias! Por último, ¿hay algo específico que creas que deberíamos mejorar o algo que te haya gustado mucho? (Puedes escribirnos un breve comentario o enviar un audio 🎤).");
-            } else {
+            } else if (!isConversationalQuery) {
                 await sendMsg("Por favor, responde con A, B, C o D.");
             }
             return true;
@@ -678,7 +721,8 @@ async function handleSurveyFlow(supabase: any, phone: string, content: string, l
             await supabase.from('encuestas_preventivos').update({ 
                 estado: 'COMPLETADA', 
                 cierre_comentario: content, 
-                cierre_audio_url: mediaUrl 
+                cierre_audio_url: mediaUrl,
+                updated_at: new Date().toISOString()
             }).eq('id', survey.id);
             await sendMsg("¡Gracias por ayudarnos a mejorar! Hemos guardado tus respuestas.");
             return true;
