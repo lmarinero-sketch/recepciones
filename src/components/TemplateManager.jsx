@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
     Plus, Pencil, Trash2, Save, Loader2, Zap, Search, X,
-    Eye, ChevronDown, ChevronRight, Variable, Copy, FileText,
+    Eye, ChevronDown, ChevronRight, Variable, Copy, FileText, DollarSign, Shield,
 } from 'lucide-react';
 import {
     fetchAllShortcuts,
@@ -14,6 +14,8 @@ import {
     updateShortcut,
     deleteShortcut,
 } from '../services/shortcutService';
+import { getConfigValue, updateConfig } from '../services/configService';
+import { fetchMetaTemplates } from '../services/metaTemplateService';
 
 // ============================================
 // Variables disponibles para insertar
@@ -79,20 +81,56 @@ export default function TemplateManager({ addToast }) {
     const [form, setForm] = useState({ shortcut: '', label: '', message: '', category: 'general' });
     const textareaRef = useRef(null);
 
+    // Parámetros de precios para Plantillas Meta (Obra Social Provincia)
+    const [precioLab, setPrecioLab] = useState('$30.000');
+    const [precioEco, setPrecioEco] = useState('$10.000');
+    const [savingPrecios, setSavingPrecios] = useState(false);
+    const [metaProvinciaTpl, setMetaProvinciaTpl] = useState(null);
+
     // ============================================
     // DATA LOADING
     // ============================================
     const loadShortcuts = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await fetchAllShortcuts();
+            const [data, labVal, ecoVal, metaTpls] = await Promise.all([
+                fetchAllShortcuts(),
+                getConfigValue('precio_deposito_laboratorio'),
+                getConfigValue('precio_diferencia_ecografia'),
+                fetchMetaTemplates(true).catch(() => []),
+            ]);
             setShortcuts(data);
+            if (labVal) setPrecioLab(labVal);
+            if (ecoVal) setPrecioEco(ecoVal);
+            const prov = (metaTpls || []).find(t => (t.name || '').toLowerCase().includes('provincia'));
+            setMetaProvinciaTpl(prov || null);
         } catch (e) {
             addToast?.('Error al cargar plantillas: ' + e.message, 'error');
         } finally {
             setLoading(false);
         }
     }, [addToast]);
+
+    const handleSavePrecios = async () => {
+        setSavingPrecios(true);
+        try {
+            await Promise.all([
+                updateConfig('precio_deposito_laboratorio', precioLab.trim() || '$30.000', {
+                    label: 'Depósito de Laboratorio (OSP)',
+                    category: 'precios_plantillas',
+                }),
+                updateConfig('precio_diferencia_ecografia', precioEco.trim() || '$10.000', {
+                    label: 'Valor Aproximado por Ecografía (sin coseguro)',
+                    category: 'precios_plantillas',
+                }),
+            ]);
+            addToast?.('✅ Variables de precios actualizadas para la plantilla de Meta', 'success');
+        } catch (e) {
+            addToast?.('Error al guardar precios: ' + e.message, 'error');
+        } finally {
+            setSavingPrecios(false);
+        }
+    };
 
     useEffect(() => { loadShortcuts(); }, [loadShortcuts]);
 
@@ -229,7 +267,144 @@ export default function TemplateManager({ addToast }) {
     // RENDER
     // ============================================
     return (
-        <div style={{ marginTop: '32px' }}>
+        <div style={{ marginTop: '12px' }}>
+            {/* ========== PARÁMETROS DE VARIABLES PARA PLANTILLA OFICIAL META (PROVINCIA) ========== */}
+            <div style={{
+                background: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: '12px',
+                padding: '18px 20px',
+                marginBottom: '26px',
+                boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+            }}>
+                <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    gap: '12px', flexWrap: 'wrap', marginBottom: '14px', paddingBottom: '10px',
+                    borderBottom: '1px solid #E2E8F0',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                            width: '34px', height: '34px', borderRadius: '9px',
+                            background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#FFFFFF',
+                        }}>
+                            <DollarSign size={18} />
+                        </div>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#0F172A' }}>
+                                Variables de Plantilla Oficial Meta — Obra Social Provincia
+                            </h4>
+                            <p style={{ margin: '2px 0 0', fontSize: '0.73rem', color: '#64748B' }}>
+                                Modificá aquí los montos. El texto de la plantilla proviene directamente de Meta (solo lectura).
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleSavePrecios}
+                        disabled={savingPrecios}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '6px',
+                            padding: '8px 16px', borderRadius: '8px', border: 'none',
+                            background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                            color: '#FFFFFF', fontSize: '0.8rem', fontWeight: 700,
+                            cursor: savingPrecios ? 'not-allowed' : 'pointer',
+                            boxShadow: '0 2px 6px rgba(2,132,199,0.28)',
+                        }}
+                    >
+                        {savingPrecios ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        {savingPrecios ? 'Guardando...' : 'Guardar Variables'}
+                    </button>
+                </div>
+
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                    gap: '14px',
+                    marginBottom: '14px',
+                }}>
+                    <div style={{
+                        background: '#F8FAFC', border: '1px solid #E2E8F0',
+                        borderRadius: '10px', padding: '12px 14px',
+                    }}>
+                        <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                            🧪 Depósito de Laboratorio (Variable <code>{'{{1}}'}</code>)
+                        </label>
+                        <input
+                            type="text"
+                            value={precioLab}
+                            onChange={e => setPrecioLab(e.target.value)}
+                            placeholder="$30.000"
+                            style={{
+                                width: '100%', padding: '8px 12px', borderRadius: '8px',
+                                border: '1px solid #CBD5E1', fontSize: '0.92rem',
+                                fontWeight: 700, color: '#0F172A', background: '#FFFFFF',
+                                boxSizing: 'border-box',
+                            }}
+                        />
+                    </div>
+
+                    <div style={{
+                        background: '#F8FAFC', border: '1px solid #E2E8F0',
+                        borderRadius: '10px', padding: '12px 14px',
+                    }}>
+                        <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                            🩺 Valor Aproximado por Ecografía (Variable <code>{'{{2}}'}</code>)
+                        </label>
+                        <input
+                            type="text"
+                            value={precioEco}
+                            onChange={e => setPrecioEco(e.target.value)}
+                            placeholder="$10.000"
+                            style={{
+                                width: '100%', padding: '8px 12px', borderRadius: '8px',
+                                border: '1px solid #CBD5E1', fontSize: '0.92rem',
+                                fontWeight: 700, color: '#0F172A', background: '#FFFFFF',
+                                boxSizing: 'border-box',
+                            }}
+                        />
+                    </div>
+                </div>
+
+                {/* Vista previa de solo lectura de la plantilla oficial de Meta */}
+                <div style={{
+                    background: '#F0FDF4',
+                    border: '1px solid #BBF7D0',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    fontSize: '0.8rem',
+                    color: '#14532D',
+                    lineHeight: 1.5,
+                }}>
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: '8px', marginBottom: '6px', flexWrap: 'wrap',
+                    }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803D', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <Shield size={12} /> Plantilla Oficial Meta: /{metaProvinciaTpl?.name || 'provincia'} (Solo lectura)
+                        </span>
+                        {metaProvinciaTpl?.status && (
+                            <span style={{
+                                fontSize: '0.66rem', fontWeight: 700, padding: '2px 8px', borderRadius: '999px',
+                                background: metaProvinciaTpl.status === 'APPROVED' ? '#DCFCE7' : '#FEF3C7',
+                                color: metaProvinciaTpl.status === 'APPROVED' ? '#15803D' : '#B45309',
+                            }}>
+                                {metaProvinciaTpl.status === 'APPROVED' ? 'Aprobada en Meta' : metaProvinciaTpl.status}
+                            </span>
+                        )}
+                    </div>
+                    <div style={{ whiteSpace: 'pre-wrap' }}>
+                        {(() => {
+                            const rawBody = metaProvinciaTpl?.components?.find(c => c.type === 'BODY')?.text
+                                || 'Te informamos que con la obra social Provincia, los análisis suelen quedar pendientes al momento del chequeo clínico, por este motivo deberá dejar en laboratorio un depósito de {{1}} por el momento; este monto puede abonarse en efectivo o con transferencia.\n\nPor otro lado, si no cuenta con coseguro, deberá abonar una diferencia por cada ecografía que le indique el médico clínico. El valor aproximado por el momento es de {{2}} por ecografía.\n\nMuchas gracias por su comprensión!!';
+                            return rawBody
+                                .replace(/\{\{1\}\}/g, precioLab || '$30.000')
+                                .replace(/\{\{2\}\}/g, precioEco || '$10.000');
+                        })()}
+                    </div>
+                </div>
+            </div>
+
             {/* Section Header */}
             <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
