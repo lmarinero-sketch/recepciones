@@ -639,7 +639,10 @@ export default function MessagingPanel({ addToast }) {
         setMessages(prev => [...prev, optimisticMsg]);
         setMessageText('');
         setShowEmoji(false);
-        inputRef.current?.focus();
+        if (inputRef.current) {
+            inputRef.current.style.height = 'auto';
+            inputRef.current.focus();
+        }
 
         setConversations(prev => {
             const idx = prev.findIndex(c => c.phone === selectedPhone);
@@ -909,6 +912,13 @@ export default function MessagingPanel({ addToast }) {
         result = result.replace(/\{total_presupuesto\}/gi, total ? `$${Number(total).toLocaleString('es-AR')}` : '');
         return result;
     }, [patientContext]);
+
+    useEffect(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(Math.max(el.scrollHeight, 52), 160)}px`;
+    }, [messageText]);
 
     const selectShortcut = useCallback((shortcut) => {
         if (shortcut._isMeta) {
@@ -2310,12 +2320,17 @@ export default function MessagingPanel({ addToast }) {
                                             {uploadingMedia ? <Loader size={18} className="msg-panel__spinner" /> : <Paperclip size={18} />}
                                         </button>
                                         <input type="file" ref={fileInputRef} accept="image/*,video/*,application/pdf" onChange={handleImageSelect} style={{ display: 'none' }} />
-                                        <input
-                                            ref={inputRef} type="text"
+                                        <textarea
+                                            ref={inputRef}
+                                            rows={2}
                                             className="msg-panel__composer-input"
-                                            placeholder="Escribe un mensaje... ( / para plantillas)"
+                                            placeholder="Escribe un mensaje... (Enter para enviar · Shift+Enter para salto de línea · / para plantillas)"
                                             value={messageText}
-                                            onChange={handleInputChange}
+                                            onChange={(e) => {
+                                                handleInputChange(e);
+                                                e.target.style.height = 'auto';
+                                                e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                                            }}
                                             onKeyDown={handleKeyDown}
                                             disabled={sending || uploadingMedia}
                                         />
