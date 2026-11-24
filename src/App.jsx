@@ -278,14 +278,14 @@ function App({ currentUser, onLogout }) {
                         </span>
                         
                         <div style={{
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            padding: '4px 4px 4px 12px',
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            padding: '2px 3px 2px 10px',
                             background: 'var(--neutral-50)',
-                            borderRadius: '20px',
+                            borderRadius: '18px',
                             border: '1px solid var(--neutral-200)',
                         }}>
                             <span style={{
-                                fontSize: '0.78rem', fontWeight: 600,
+                                fontSize: '0.72rem', fontWeight: 600,
                                 color: 'var(--neutral-600)',
                             }}>
                                 {currentUser.nombre?.includes('@')
@@ -293,10 +293,10 @@ function App({ currentUser, onLogout }) {
                                     : currentUser.nombre}
                             </span>
                             <div style={{
-                                width: '28px', height: '28px', borderRadius: '50%',
+                                width: '22px', height: '22px', borderRadius: '50%',
                                 background: 'linear-gradient(135deg, #6366F1, #4F46E5)',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '0.65rem', fontWeight: 800, color: '#fff',
+                                fontSize: '0.6rem', fontWeight: 800, color: '#fff',
                             }}>
                                 {currentUser.iniciales}
                             </div>
@@ -304,27 +304,27 @@ function App({ currentUser, onLogout }) {
                                 onClick={() => setShowChangePassword(true)}
                                 title="Cambiar contraseña"
                                 style={{
-                                    width: '28px', height: '28px', borderRadius: '50%',
+                                    width: '22px', height: '22px', borderRadius: '50%',
                                     background: 'none', border: '1px solid var(--neutral-200)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     cursor: 'pointer', color: 'var(--neutral-400)',
                                     transition: 'all 0.2s',
                                 }}
                             >
-                                <KeyRound size={13} />
+                                <KeyRound size={11} />
                             </button>
                             <button
                                 onClick={onLogout}
                                 title="Cerrar sesión"
                                 style={{
-                                    width: '28px', height: '28px', borderRadius: '50%',
+                                    width: '22px', height: '22px', borderRadius: '50%',
                                     background: 'none', border: '1px solid var(--neutral-200)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     cursor: 'pointer', color: 'var(--neutral-400)',
                                     transition: 'all 0.2s',
                                 }}
                             >
-                                <LogOut size={13} />
+                                <LogOut size={11} />
                             </button>
                         </div>
                     </div>
