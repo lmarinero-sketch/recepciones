@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Settings, Eye, EyeOff, Save, RotateCw, CheckCircle, AlertTriangle,
     Key, Building2, Globe, Copy, ExternalLink, Zap, Shield,
-    Phone, ToggleLeft, ToggleRight, Smartphone,
+    Phone, ToggleLeft, ToggleRight, Smartphone, DollarSign,
 } from 'lucide-react';
-import { getAllConfig, updateMultipleConfigs, getAllWhatsAppLines, updateWhatsAppLine, testWhatsAppLineConnection } from '../services/configService';
+import { getAllConfig, updateConfig, updateMultipleConfigs, getAllWhatsAppLines, updateWhatsAppLine, testWhatsAppLineConnection } from '../services/configService';
 
 // Configuración de los campos con metadata para UI
 const FIELD_META = {
@@ -62,6 +62,11 @@ export default function ConfigPanel({ addToast }) {
     const [lineTestResults, setLineTestResults] = useState({});
     const [lineHasChanges, setLineHasChanges] = useState({});
 
+    // Parámetros de precios para plantillas Meta (OSP)
+    const [precioLab, setPrecioLab] = useState('$30.000');
+    const [precioEco, setPrecioEco] = useState('$10.000');
+    const [savingPrecios, setSavingPrecios] = useState(false);
+
     const loadConfig = useCallback(async () => {
         try {
             setLoading(true);
@@ -73,6 +78,8 @@ export default function ConfigPanel({ addToast }) {
             const vals = {};
             data.forEach(c => { vals[c.key] = c.value; });
             setEditValues(vals);
+            if (vals.precio_deposito_laboratorio) setPrecioLab(vals.precio_deposito_laboratorio);
+            if (vals.precio_diferencia_ecografia) setPrecioEco(vals.precio_diferencia_ecografia);
             setHasChanges(false);
 
             // Lines
@@ -220,9 +227,33 @@ export default function ConfigPanel({ addToast }) {
         setLineShowSecrets(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    // Agrupar configs por categoría
+    const handleSavePrecios = async () => {
+        try {
+            setSavingPrecios(true);
+            await Promise.all([
+                updateConfig('precio_deposito_laboratorio', precioLab.trim() || '$30.000', {
+                    label: 'Depósito de Laboratorio (OSP)',
+                    category: 'precios_plantillas',
+                }),
+                updateConfig('precio_diferencia_ecografia', precioEco.trim() || '$10.000', {
+                    label: 'Valor Aproximado por Ecografía (sin coseguro)',
+                    category: 'precios_plantillas',
+                }),
+            ]);
+            addToast?.('✅ Precios de plantillas actualizados correctamente', 'success');
+            await loadConfig();
+        } catch (e) {
+            console.error(e);
+            addToast?.('Error al guardar precios: ' + e.message, 'error');
+        } finally {
+            setSavingPrecios(false);
+        }
+    };
+
+    // Agrupar configs por categoría (excluyendo precios_plantillas que tiene su tarjeta propia)
     const grouped = {};
     configs.forEach(c => {
+        if (c.category === 'precios_plantillas') return;
         if (!grouped[c.category]) grouped[c.category] = [];
         grouped[c.category].push(c);
     });
@@ -286,6 +317,127 @@ export default function ConfigPanel({ addToast }) {
                             {saving ? <RotateCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
                             {saving ? 'Guardando...' : 'Guardar Cambios'}
                         </button>
+                    </div>
+                </div>
+
+                {/* ========== PARÁMETROS DE PRECIOS PARA PLANTILLAS META (OSP) ========== */}
+                <div style={{ marginTop: '24px' }}>
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        marginBottom: '14px', paddingBottom: '8px',
+                        borderBottom: '2px solid #0284C720',
+                    }}>
+                        <div style={{
+                            width: '32px', height: '32px', borderRadius: '8px',
+                            background: '#0284C715', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                        }}>
+                            <DollarSign size={16} color="#0284C7" />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--neutral-700)' }}>
+                                Parámetros de Precios — Plantillas Meta (Obra Social Provincia)
+                            </h4>
+                            <p style={{ margin: '2px 0 0', fontSize: '0.73rem', color: 'var(--neutral-400)' }}>
+                                Estos valores se completan automáticamente en la plantilla oficial de Meta y en el atajo <code>/osp_deposito</code>
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleSavePrecios}
+                            disabled={savingPrecios}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                padding: '8px 16px', borderRadius: 'var(--radius-md)',
+                                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                                color: '#fff', border: 'none', cursor: savingPrecios ? 'not-allowed' : 'pointer',
+                                fontSize: '0.78rem', fontWeight: 700,
+                                boxShadow: '0 2px 8px rgba(2,132,199,0.28)',
+                            }}
+                        >
+                            {savingPrecios ? <RotateCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={13} />}
+                            {savingPrecios ? 'Guardando...' : 'Guardar Precios'}
+                        </button>
+                    </div>
+
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                        gap: '14px',
+                        marginBottom: '14px',
+                    }}>
+                        <div style={{
+                            background: '#FFFFFF',
+                            border: '1px solid var(--neutral-200)',
+                            borderRadius: '10px',
+                            padding: '14px 16px',
+                        }}>
+                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--neutral-700)', marginBottom: '6px' }}>
+                                🧪 Depósito de Laboratorio (Variable <code>{'{{1}}'}</code>)
+                            </label>
+                            <input
+                                type="text"
+                                value={precioLab}
+                                onChange={e => setPrecioLab(e.target.value)}
+                                placeholder="$30.000"
+                                style={{
+                                    width: '100%', padding: '9px 12px', borderRadius: '8px',
+                                    border: '1px solid var(--neutral-300)', fontSize: '0.92rem',
+                                    fontWeight: 700, color: '#0F172A', background: '#F8FAFC',
+                                    boxSizing: 'border-box',
+                                }}
+                            />
+                            <p style={{ margin: '5px 0 0', fontSize: '0.7rem', color: 'var(--neutral-400)' }}>
+                                Monto a dejar en laboratorio por análisis pendientes (OSP).
+                            </p>
+                        </div>
+
+                        <div style={{
+                            background: '#FFFFFF',
+                            border: '1px solid var(--neutral-200)',
+                            borderRadius: '10px',
+                            padding: '14px 16px',
+                        }}>
+                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--neutral-700)', marginBottom: '6px' }}>
+                                🩺 Valor Aproximado por Ecografía (Variable <code>{'{{2}}'}</code>)
+                            </label>
+                            <input
+                                type="text"
+                                value={precioEco}
+                                onChange={e => setPrecioEco(e.target.value)}
+                                placeholder="$10.000"
+                                style={{
+                                    width: '100%', padding: '9px 12px', borderRadius: '8px',
+                                    border: '1px solid var(--neutral-300)', fontSize: '0.92rem',
+                                    fontWeight: 700, color: '#0F172A', background: '#F8FAFC',
+                                    boxSizing: 'border-box',
+                                }}
+                            />
+                            <p style={{ margin: '5px 0 0', fontSize: '0.7rem', color: 'var(--neutral-400)' }}>
+                                Diferencia aproximada por ecografía cuando el paciente no cuenta con coseguro.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Vista previa en vivo del mensaje */}
+                    <div style={{
+                        background: '#F0FDF4',
+                        border: '1px solid #BBF7D0',
+                        borderRadius: '10px',
+                        padding: '12px 16px',
+                        fontSize: '0.8rem',
+                        color: '#14532D',
+                        lineHeight: 1.5,
+                    }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#15803D', textTransform: 'uppercase', marginBottom: '6px' }}>
+                            Vista previa del mensaje que recibirá el paciente:
+                        </div>
+                        <div>
+                            Te informamos que con la obra social Provincia, los análisis suelen quedar pendientes al momento del chequeo clínico, por este motivo deberá dejar en laboratorio un depósito de <strong>{precioLab || '$30.000'}</strong> por el momento; este monto puede abonarse en efectivo o con transferencia.
+                            <br />
+                            Por otro lado, si no cuenta con coseguro, deberá abonar una diferencia por cada ecografía que le indique el médico clínico. El valor aproximado por el momento es de <strong>{precioEco || '$10.000'}</strong> por ecografía.
+                            <br />
+                            Muchas gracias por su comprensión!!
+                        </div>
                     </div>
                 </div>
 

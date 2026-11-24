@@ -44,17 +44,20 @@ export async function getConfigValue(key) {
 }
 
 /**
- * Actualiza un valor de configuración
+ * Actualiza o inserta un valor de configuración
  */
-export async function updateConfig(key, value) {
+export async function updateConfig(key, value, meta = {}) {
     const { error } = await supabase
         .from('app_config')
-        .update({
+        .upsert({
+            key,
             value,
+            ...(meta.label ? { label: meta.label } : {}),
+            ...(meta.category ? { category: meta.category } : {}),
+            is_secret: meta.is_secret ?? false,
             updated_at: new Date().toISOString(),
             updated_by: 'admin',
-        })
-        .eq('key', key);
+        }, { onConflict: 'key' });
 
     if (error) throw error;
 }

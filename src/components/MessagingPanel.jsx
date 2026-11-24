@@ -103,8 +103,15 @@ export default function MessagingPanel({ addToast }) {
     const [metaTemplateError, setMetaTemplateError] = useState(null);
     const [showMetaCostModal, setShowMetaCostModal] = useState(false);
     const [pendingMetaTemplate, setPendingMetaTemplate] = useState(null);
+    const [metaTemplateVars, setMetaTemplateVars] = useState([]); // [{ index: 1, label: '...', value: '...' }]
     const [sendingMetaTemplate, setSendingMetaTemplate] = useState(false);
     const [templateJustSent, setTemplateJustSent] = useState(false);
+
+    // Parámetros de precios configurables (app_config)
+    const [priceParams, setPriceParams] = useState({
+        depositoLaboratorio: '$30.000',
+        diferenciaEcografia: '$10.000',
+    });
 
     // Patient context (SALUS visitas + optional surgery/budget)
     const [visitasMap, setVisitasMap] = useState({});
@@ -551,7 +558,7 @@ export default function MessagingPanel({ addToast }) {
         return unsub;
     }, [selectedPhone]);
 
-    // === LOAD SHORTCUTS + META TEMPLATES ===
+    // === LOAD SHORTCUTS + META TEMPLATES + PRICE PARAMS ===
     useEffect(() => {
         fetchShortcuts(true).then(setShortcuts).catch(err => {
             console.warn('Could not load shortcuts:', err);
@@ -563,6 +570,21 @@ export default function MessagingPanel({ addToast }) {
             console.warn('Could not load Meta templates:', err);
             setMetaTemplateError(err?.message || 'Error cargando plantillas');
         });
+        supabase
+            .from('app_config')
+            .select('key, value')
+            .in('key', ['precio_deposito_laboratorio', 'precio_diferencia_ecografia'])
+            .then(({ data }) => {
+                if (data && data.length > 0) {
+                    const lab = data.find(r => r.key === 'precio_deposito_laboratorio')?.value;
+                    const eco = data.find(r => r.key === 'precio_diferencia_ecografia')?.value;
+                    setPriceParams(prev => ({
+                        depositoLaboratorio: lab || prev.depositoLaboratorio,
+                        diferenciaEcografia: eco || prev.diferenciaEcografia,
+                    }));
+                }
+            })
+            .catch(err => console.warn('Could not load price params:', err));
     }, []);
 
     useEffect(() => {
@@ -910,8 +932,10 @@ export default function MessagingPanel({ addToast }) {
         const total = patientContext?.budget?.importe_total;
         result = result.replace(/\{presupuesto_total\}/gi, total ? `$${Number(total).toLocaleString('es-AR')}` : '');
         result = result.replace(/\{total_presupuesto\}/gi, total ? `$${Number(total).toLocaleString('es-AR')}` : '');
+        result = result.replace(/\{precio_deposito_laboratorio\}/gi, priceParams.depositoLaboratorio || '$30.000');
+        result = result.replace(/\{precio_diferencia_ecografia\}/gi, priceParams.diferenciaEcografia || '$10.000');
         return result;
-    }, [patientContext]);
+    }, [patientContext, priceParams]);
 
     useEffect(() => {
         const el = inputRef.current;
@@ -920,9 +944,43 @@ export default function MessagingPanel({ addToast }) {
         el.style.height = `${Math.min(Math.max(el.scrollHeight, 52), 160)}px`;
     }, [messageText]);
 
+    // Extrae variables {{1}}, {{2}}, ... del cuerpo de una plantilla Meta y las autocompleta
+    const buildMetaTemplateVars = useCallback((templateObj) => {
+        const bodyComponent = templateObj?._metaData?.components?.find(c => c.type === 'BODY');
+        const bodyText = bodyComponent?.text || templateObj?.message || '';
+        const matches = [...bodyText.matchAll(/\{\{(\d+)\}\}/g)];
+        if (matches.length === 0) return [];
+
+        const uniqueIndices = [...new Set(matches.map(m => Number(m[1])))].sort((a, b) => a - b);
+        const patientDisplay = selectedPhone ? (getResolvedPatientInfo(selectedPhone).displayName || 'Paciente') : 'Paciente';
+
+        return uniqueIndices.map(idx => {
+            const token = `{{${idx}}}`;
+            const pos = bodyText.indexOf(token);
+            const around = bodyText.slice(Math.max(0, pos - 70), Math.min(bodyText.length, pos + 70)).toLowerCase();
+
+            let label = `Variable ${idx}`;
+            let value = '';
+
+            if (/dep[oó]sito|laboratorio|an[aá]lisis/.test(around)) {
+                label = 'Depósito de Laboratorio';
+                value = priceParams.depositoLaboratorio || '$30.000';
+            } else if (/ecograf[ií]a|coseguro|diferencia/.test(around)) {
+                label = 'Valor Aproximado por Ecografía';
+                value = priceParams.diferenciaEcografia || '$10.000';
+            } else if (idx === 1) {
+                label = 'Nombre del Paciente';
+                value = patientDisplay;
+            }
+
+            return { index: idx, label, value };
+        });
+    }, [selectedPhone, getResolvedPatientInfo, priceParams]);
+
     const selectShortcut = useCallback((shortcut) => {
         if (shortcut._isMeta) {
             setPendingMetaTemplate(shortcut);
+            setMetaTemplateVars(buildMetaTemplateVars(shortcut));
             setShowMetaCostModal(true);
             setShowShortcuts(false);
             setShortcutFilter('');
@@ -936,7 +994,7 @@ export default function MessagingPanel({ addToast }) {
         setShortcutFilter('');
         setShortcutIndex(0);
         inputRef.current?.focus();
-    }, [selectedPhone, getResolvedPatientInfo, personalizeMessage]);
+    }, [selectedPhone, getResolvedPatientInfo, personalizeMessage, buildMetaTemplateVars]);
 
     const confirmSendMetaTemplate = useCallback(async () => {
         if (!pendingMetaTemplate || !selectedPhone || sendingMetaTemplate) return;
@@ -946,14 +1004,9 @@ export default function MessagingPanel({ addToast }) {
             const templateName = pendingMetaTemplate._metaData?.name || pendingMetaTemplate.shortcut;
             const lang = pendingMetaTemplate._metaData?.language || 'es';
 
-            const bodyComponent = pendingMetaTemplate._metaData?.components?.find(c => c.type === 'BODY');
-            const bodyText = bodyComponent?.text || '';
-            const hasBodyVariables = /\{\{\d+\}\}/.test(bodyText);
-
-            const patientDisplay = getResolvedPatientInfo(selectedPhone).displayName || 'Paciente';
-            const components = hasBodyVariables ? [{
+            const components = metaTemplateVars.length > 0 ? [{
                 type: 'body',
-                parameters: [{ type: 'text', text: patientDisplay }]
+                parameters: metaTemplateVars.map(v => ({ type: 'text', text: (v.value || '').trim() || '-' }))
             }] : [];
 
             await sendMetaTemplate({
@@ -969,9 +1022,14 @@ export default function MessagingPanel({ addToast }) {
                 .map(b => b.text)
                 .filter(Boolean);
 
+            let resolvedText = pendingMetaTemplate.message || '';
+            metaTemplateVars.forEach(v => {
+                resolvedText = resolvedText.replace(new RegExp(`\\{\\{${v.index}\\}\\}`, 'g'), (v.value || '').trim() || '-');
+            });
+
             await saveOutgoingMessage({
                 phone: selectedPhone,
-                content: `📋 [Plantilla Meta] ${templateName}: ${pendingMetaTemplate.message.replace(/\{\{1\}\}/g, patientDisplay)}`,
+                content: `📋 [Plantilla Meta] ${templateName}: ${resolvedText}`,
                 lineId: 'line_recepciones',
                 rawPayload: templateButtons.length > 0 ? { templateButtons } : undefined,
             });
@@ -984,9 +1042,10 @@ export default function MessagingPanel({ addToast }) {
             setSendingMetaTemplate(false);
             setShowMetaCostModal(false);
             setPendingMetaTemplate(null);
+            setMetaTemplateVars([]);
             inputRef.current?.focus();
         }
-    }, [pendingMetaTemplate, selectedPhone, sendingMetaTemplate, addToast, getResolvedPatientInfo]);
+    }, [pendingMetaTemplate, metaTemplateVars, selectedPhone, sendingMetaTemplate, addToast]);
 
     useEffect(() => {
         if (!showMetaCostModal) return;
@@ -1012,16 +1071,18 @@ export default function MessagingPanel({ addToast }) {
 
     const quickSendMetaTemplate = useCallback((template) => {
         const bodyText = template.components?.find(c => c.type === 'BODY')?.text || template.body || `[Plantilla: ${template.name}]`;
-        setPendingMetaTemplate({
+        const tplObj = {
             id: `meta_${template.name || template.id}`,
             shortcut: template.name || template.templateName || 'template',
             label: template.name || template.templateName || 'Template',
             message: bodyText,
             _isMeta: true,
             _metaData: template,
-        });
+        };
+        setPendingMetaTemplate(tplObj);
+        setMetaTemplateVars(buildMetaTemplateVars(tplObj));
         setShowMetaCostModal(true);
-    }, []);
+    }, [buildMetaTemplateVars]);
 
     // ==========================================
     // NEW CONVERSATION
@@ -2391,13 +2452,48 @@ export default function MessagingPanel({ addToast }) {
                             background: '#FFFBEB', borderRadius: '10px', padding: '12px 14px',
                             marginBottom: '14px', border: '1px solid #FDE68A',
                         }}>
-                            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#92400E', marginBottom: '4px' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', marginBottom: '6px' }}>
                                 📋 /{pendingMetaTemplate.shortcut}
                             </div>
-                            <div style={{ fontSize: '0.78rem', color: '#78350F', lineHeight: '1.4', maxHeight: '80px', overflowY: 'auto' }}>
-                                {pendingMetaTemplate.message?.substring(0, 200)}{pendingMetaTemplate.message?.length > 200 ? '...' : ''}
+                            <div style={{ fontSize: '0.79rem', color: '#78350F', lineHeight: '1.45', maxHeight: '140px', overflowY: 'auto', whiteSpace: 'pre-wrap' }}>
+                                {(() => {
+                                    let preview = pendingMetaTemplate.message || '';
+                                    metaTemplateVars.forEach(v => {
+                                        preview = preview.replace(new RegExp(`\\{\\{${v.index}\\}\\}`, 'g'), v.value || `{{${v.index}}}`);
+                                    });
+                                    return preview;
+                                })()}
                             </div>
                         </div>
+
+                        {metaTemplateVars.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                                    Parámetros de la Plantilla (editables):
+                                </div>
+                                {metaTemplateVars.map((v, idx) => (
+                                    <div key={v.index} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                        <label style={{ fontSize: '0.74rem', fontWeight: 600, color: '#334155' }}>
+                                            {v.label} <span style={{ color: '#94A3B8', fontWeight: 400 }}>({`{{${v.index}}}`})</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={v.value}
+                                            onChange={e => {
+                                                const updated = [...metaTemplateVars];
+                                                updated[idx] = { ...v, value: e.target.value };
+                                                setMetaTemplateVars(updated);
+                                            }}
+                                            style={{
+                                                width: '100%', padding: '7px 10px', borderRadius: '8px',
+                                                border: '1px solid #CBD5E1', fontSize: '0.84rem',
+                                                fontWeight: 600, color: '#0F172A', boxSizing: 'border-box',
+                                            }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         <div style={{
                             background: '#FEF2F2', borderRadius: '8px', padding: '10px 12px',

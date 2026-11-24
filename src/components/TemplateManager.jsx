@@ -31,6 +31,8 @@ const AVAILABLE_VARIABLES = [
     { key: '{fecha_hoy}', label: 'Fecha de Hoy', icon: '🗓️', color: '#F59E0B', group: 'Fechas' },
     { key: '{presupuesto_total}', label: 'Presupuesto Total', icon: '💰', color: '#22C55E', group: 'Presupuesto' },
     { key: '{valor_chequeo}', label: 'Valor del Chequeo', icon: '💵', color: '#22C55E', group: 'Presupuesto' },
+    { key: '{precio_deposito_laboratorio}', label: 'Depósito Laboratorio (OSP)', icon: '🧪', color: '#16A34A', group: 'Presupuesto' },
+    { key: '{precio_diferencia_ecografia}', label: 'Valor Ecografía (sin coseguro)', icon: '🩺', color: '#16A34A', group: 'Presupuesto' },
     { key: '{sede}', label: 'Sede de Atención', icon: '🏥', color: '#6366F1', group: 'General' },
 ];
 
@@ -48,6 +50,8 @@ const PREVIEW_DATA = {
     '{fecha_hoy}': new Date().toLocaleDateString('es-AR'),
     '{presupuesto_total}': '$350.000',
     '{valor_chequeo}': '$270.000',
+    '{precio_deposito_laboratorio}': '$30.000',
+    '{precio_diferencia_ecografia}': '$10.000',
     '{sede}': 'Santa Fe',
 };
 
