@@ -112,13 +112,32 @@ export default function MessagingPanel({ addToast }) {
     const [showBudgetDetail, setShowBudgetDetail] = useState(false);
     const [quickFilter, setQuickFilter] = useState('all'); // 'all' | 'today' | 'week' | 'informe' | 'presente' | 'unread'
 
+    // View Mode: 'classic' (limpia original por defecto) | 'detailed' (estética ADM-QUI)
+    const [viewMode, setViewMode] = useState(() => {
+        try {
+            return localStorage.getItem('msg_view_mode') || 'classic';
+        } catch {
+            return 'classic';
+        }
+    });
+    const isClassic = viewMode === 'classic';
+
+    const toggleViewMode = useCallback(() => {
+        setViewMode(prev => {
+            const next = prev === 'classic' ? 'detailed' : 'classic';
+            try { localStorage.setItem('msg_view_mode', next); } catch {}
+            return next;
+        });
+    }, []);
+
     // Resizable Sidebar Width (Drag & Drop splitter)
     const [sidebarWidth, setSidebarWidth] = useState(() => {
+        const defaultW = typeof window !== 'undefined' && window.innerWidth <= 1366 ? 300 : 340;
         try {
             const saved = Number(localStorage.getItem('msg_panel_sidebar_width'));
-            return saved >= 320 && saved <= 750 ? saved : 440;
+            return saved >= 240 && saved <= 650 ? saved : defaultW;
         } catch {
-            return 440;
+            return defaultW;
         }
     });
     const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
@@ -230,7 +249,7 @@ export default function MessagingPanel({ addToast }) {
         const handleMouseMove = (e) => {
             if (!panelContainerRef.current) return;
             const rect = panelContainerRef.current.getBoundingClientRect();
-            const newWidth = Math.min(750, Math.max(320, e.clientX - rect.left));
+            const newWidth = Math.min(650, Math.max(240, e.clientX - rect.left));
             setSidebarWidth(newWidth);
         };
 
@@ -1150,7 +1169,7 @@ export default function MessagingPanel({ addToast }) {
             });
         }
 
-        if (quickFilter === 'today') {
+        if (!isClassic && quickFilter === 'today') {
             const now = new Date();
             const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
             list = list.filter(c => {
@@ -1159,7 +1178,7 @@ export default function MessagingPanel({ addToast }) {
                 const d = new Date(visit.fecha + 'T12:00:00').getTime();
                 return d === todayStart;
             });
-        } else if (quickFilter === 'week') {
+        } else if (!isClassic && quickFilter === 'week') {
             const now = new Date();
             const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
             const next7Days = todayStart + (7 * 24 * 60 * 60 * 1000);
@@ -1169,11 +1188,11 @@ export default function MessagingPanel({ addToast }) {
                 const d = new Date(visit.fecha + 'T12:00:00').getTime();
                 return d >= todayStart && d <= next7Days;
             });
-        } else if (quickFilter === 'informe') {
+        } else if (!isClassic && quickFilter === 'informe') {
             list = list.filter(c => String(getVisitForPhone(c.phone)?.tipo_visita || '').toUpperCase().includes('INFORME'));
-        } else if (quickFilter === 'presente') {
+        } else if (!isClassic && quickFilter === 'presente') {
             list = list.filter(c => getVisitForPhone(c.phone)?.asistencia === 'Presente');
-        } else if (quickFilter === 'unread') {
+        } else if (!isClassic && quickFilter === 'unread') {
             list = list.filter(c => c.unreadCount > 0);
         }
 
@@ -1182,7 +1201,7 @@ export default function MessagingPanel({ addToast }) {
             if (b.unreadCount > 0 && a.unreadCount === 0) return 1;
             return new Date(b.lastDate) - new Date(a.lastDate);
         });
-    }, [conversations, searchQuery, getResolvedPatientInfo, getVisitForPhone, quickFilter]);
+    }, [conversations, searchQuery, getResolvedPatientInfo, getVisitForPhone, quickFilter, isClassic]);
 
     const totalUnread = useMemo(() => conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0), [conversations]);
 
@@ -1333,9 +1352,9 @@ export default function MessagingPanel({ addToast }) {
     //  RENDER
     // ===========================
     return (
-        <div className="msg-panel" ref={panelContainerRef} style={{ userSelect: isDraggingSidebar ? 'none' : 'auto' }}>
+        <div className={`msg-panel ${isClassic ? 'msg-panel--classic' : ''}`} ref={panelContainerRef} style={{ userSelect: isDraggingSidebar ? 'none' : 'auto' }}>
             {/* ========== LEFT: Conversation List ========== */}
-            <div className="msg-panel__sidebar" style={{ width: `${sidebarWidth}px`, minWidth: '320px', maxWidth: '750px' }}>
+            <div className="msg-panel__sidebar" style={{ width: `${sidebarWidth}px` }}>
                 <div className="msg-panel__sidebar-header">
                     <h3 className="msg-panel__sidebar-title">
                         <MessageSquare size={18} />
@@ -1344,7 +1363,27 @@ export default function MessagingPanel({ addToast }) {
                             <span className="msg-panel__total-badge">{totalUnread}</span>
                         )}
                     </h3>
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <button
+                            type="button"
+                            onClick={toggleViewMode}
+                            title={isClassic ? 'Cambiar a Vista Detallada (con chips y filtros)' : 'Volver a Vista Clásica (limpia y compacta)'}
+                            style={{
+                                height: '28px',
+                                padding: '0 8px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--neutral-200)',
+                                background: isClassic ? 'var(--neutral-50)' : '#EFF6FF',
+                                color: isClassic ? 'var(--neutral-600)' : '#1D4ED8',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                transition: 'all 0.15s',
+                            }}
+                        >
+                            {isClassic ? 'Vista: Clásica' : 'Vista: Detallada'}
+                        </button>
                         {totalUnread > 0 && (
                             <button
                                 className="msg-panel__btn-icon"
@@ -1380,7 +1419,8 @@ export default function MessagingPanel({ addToast }) {
                     />
                 </div>
 
-                {/* ── Quick Operational Filters Bar (Desplazable con rueda, arrastre o flechas) ── */}
+                {/* ── Quick Operational Filters Bar (solo en Vista Detallada) ── */}
+                {!isClassic && (
                 <div style={{ position: 'relative', flexShrink: 0, padding: '2px 8px 6px' }}>
                     {canScrollLeft && (
                         <button
@@ -1571,6 +1611,7 @@ export default function MessagingPanel({ addToast }) {
                         )}
                     </div>
                 </div>
+                )}
 
                 {/* New Chat Form */}
                 {showNewChat && (
@@ -1639,12 +1680,14 @@ export default function MessagingPanel({ addToast }) {
                             const visit = getVisitForPhone(conv.phone);
                             const dateInfo = getVisitDateInfo(visit);
 
-                            // Left border accent color based on visit status or unread
-                            const leftBorderColor = dateInfo
-                                ? (dateInfo.isToday ? '#DC2626' : dateInfo.cfg.accent)
-                                : hasUnread
-                                    ? '#2563EB'
-                                    : 'transparent';
+                            // Left border accent color based on visit status or unread (solo en Vista Detallada)
+                            const leftBorderColor = !isClassic
+                                ? (dateInfo
+                                    ? (dateInfo.isToday ? '#DC2626' : dateInfo.cfg.accent)
+                                    : hasUnread
+                                        ? '#2563EB'
+                                        : 'transparent')
+                                : 'transparent';
 
                             return (
                                 <button
@@ -1657,7 +1700,7 @@ export default function MessagingPanel({ addToast }) {
                                 >
                                     <div
                                         className="msg-panel__conv-avatar"
-                                        style={dateInfo ? {
+                                        style={!isClassic && dateInfo ? {
                                             background: dateInfo.isToday
                                                 ? 'linear-gradient(135deg, #DC2626, #EF4444)'
                                                 : dateInfo.isTomorrow
@@ -1669,8 +1712,8 @@ export default function MessagingPanel({ addToast }) {
                                         {name.charAt(0).toUpperCase()}
                                     </div>
                                     <div className="msg-panel__conv-info">
-                                        {/* FILA 1: PROTAGONISTA VISUAL -> Fecha de Turno + Estado */}
-                                        {dateInfo && (
+                                        {/* FILA 1: PROTAGONISTA VISUAL -> Fecha de Turno + Estado (solo en Vista Detallada) */}
+                                        {!isClassic && dateInfo && (
                                             <div style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -1740,7 +1783,7 @@ export default function MessagingPanel({ addToast }) {
                                                 <span className={`msg-panel__conv-name ${hasUnread ? 'msg-panel__conv-name--bold' : ''}`}>
                                                     {name}
                                                 </span>
-                                                {patientInfo.cellName && (
+                                                {!isClassic && patientInfo.cellName && (
                                                     <span style={{
                                                         fontSize: '0.68rem',
                                                         color: '#64748B',
@@ -1817,6 +1860,13 @@ export default function MessagingPanel({ addToast }) {
             {/* ========== RIGHT: Chat View ========== */}
             <div className="msg-panel__chat">
                 {!selectedPhone ? (
+                    isClassic ? (
+                        <div className="msg-panel__chat-empty">
+                            <div className="msg-panel__chat-empty-icon"><MessageSquare size={40} strokeWidth={1.3} /></div>
+                            <h3>Centro de Mensajería</h3>
+                            <p>Seleccioná una conversación o iniciá un nuevo chat</p>
+                        </div>
+                    ) : (
                     <div style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -1898,21 +1948,24 @@ export default function MessagingPanel({ addToast }) {
                             </div>
                         </div>
                     </div>
+                    )
                 ) : (
                     <>
                         {/* Chat Header with Patient Context */}
                         <div className="msg-panel__chat-header" style={{ flexDirection: 'column', alignItems: 'stretch', padding: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: isClassic ? '8px 16px' : '10px 16px' }}>
                                 <button className="msg-panel__btn-icon msg-panel__back-btn" onClick={() => setSelectedPhone(null)}>
                                     <ArrowLeft size={18} />
                                 </button>
                                 <div className="msg-panel__chat-header-avatar">
                                     {(activePatientInfo.displayName || 'S').charAt(0).toUpperCase()}
                                 </div>
-                                <div className="msg-panel__chat-header-info" style={{ flex: 1 }}>
+                                <div className="msg-panel__chat-header-info" style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                        <span className="msg-panel__chat-header-name">{activePatientInfo.displayName}</span>
-                                        {activePatientInfo.cellName && (
+                                        <span className="msg-panel__chat-header-name" style={isClassic ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : undefined}>
+                                            {activePatientInfo.displayName}
+                                        </span>
+                                        {!isClassic && activePatientInfo.cellName && (
                                             <span style={{
                                                 fontSize: '0.68rem',
                                                 padding: '1px 8px',
@@ -1924,7 +1977,7 @@ export default function MessagingPanel({ addToast }) {
                                                 📱 Celu: {activePatientInfo.cellName}
                                             </span>
                                         )}
-                                        {activePatientInfo.dni && (
+                                        {!isClassic && activePatientInfo.dni && (
                                             <span style={{
                                                 fontSize: '0.7rem',
                                                 color: '#64748B',
@@ -1947,7 +2000,7 @@ export default function MessagingPanel({ addToast }) {
                                         >
                                             <Copy size={11} />
                                         </button>
-                                        {currentLine && (
+                                        {!isClassic && currentLine && (
                                             <span
                                                 onClick={() => whatsappLines.length > 1 && setShowChangeLineModal(true)}
                                                 style={{
@@ -1970,8 +2023,21 @@ export default function MessagingPanel({ addToast }) {
                                     </div>
                                 </div>
 
-                                {/* Quick info badges (Visit or Surgery context) */}
-                                {(patientContext?.visit || patientContext?.surgery) && (
+                                {/* Quick info badges */}
+                                {isClassic ? (
+                                    patientContext?.visitas?.length > 0 && (
+                                        <button
+                                            className="msg-panel__context-badge"
+                                            style={{ background: '#F8FAFC', color: '#475569', border: '1px solid #E2E8F0', cursor: 'pointer', flexShrink: 0 }}
+                                            onClick={() => setShowBudgetDetail(prev => !prev)}
+                                            title="Ver turnos del paciente en SALUS"
+                                        >
+                                            <FileText size={12} />
+                                            Historial ({patientContext.visitas.length})
+                                            {showBudgetDetail ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                        </button>
+                                    )
+                                ) : (patientContext?.visit || patientContext?.surgery) && (
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                                         {(patientContext.visit?.fecha || patientContext.surgery?.fecha_cirugia) && (
                                             <span className="msg-panel__context-badge" style={{ background: '#EFF6FF', color: '#2563EB' }}>
@@ -2099,8 +2165,8 @@ export default function MessagingPanel({ addToast }) {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Meta 24h expired — Inline template picker (1-click send) */}
-                        {isMetaLine && isWindowExpired ? (
+                        {/* Meta 24h expired — Inline template picker (solo en Vista Detallada; en Clásica el composer siempre queda libre con / para plantillas) */}
+                        {!isClassic && isMetaLine && isWindowExpired ? (
                             <div style={{
                                 borderTop: '2px solid #FDE68A',
                                 background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',

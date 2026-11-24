@@ -100,6 +100,16 @@ function App({ currentUser, onLogout }) {
     const [showChangePassword, setShowChangePassword] = useState(false);
     const [toasts, setToasts] = useState([]);
     const [globalUnreadCount, setGlobalUnreadCount] = useState(0);
+    const [fontSizeMode, setFontSizeMode] = useState(() => localStorage.getItem('ui_font_size') || 'normal');
+
+    const handleFontSizeChange = useCallback((mode) => {
+        setFontSizeMode(mode);
+        try { localStorage.setItem('ui_font_size', mode); } catch {}
+    }, []);
+
+    useEffect(() => {
+        document.documentElement.setAttribute('data-font-size', fontSizeMode);
+    }, [fontSizeMode]);
 
     const addToast = useCallback((message, type = 'info') => {
         const id = uuidv4();
@@ -217,7 +227,52 @@ function App({ currentUser, onLogout }) {
                     
                     {/* WhatsAppLineStatus removido — sistema unificado a una sola cuenta BuilderBot */}
                     
-                    <div className="topbar__right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="topbar__right" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {/* Control de tamaño de letra para accesibilidad / monitores chicos */}
+                        <div
+                            className="topbar__font-ctrl"
+                            title="Tamaño de letra (ideal para monitores chicos o lectura cómoda)"
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                background: 'var(--neutral-50)',
+                                border: '1px solid var(--neutral-200)',
+                                borderRadius: '18px',
+                                padding: '2px',
+                                gap: '2px',
+                            }}
+                        >
+                            {[
+                                { id: 'normal', label: 'A', title: 'Letra Normal (100%)', size: '0.72rem' },
+                                { id: 'large', label: 'A+', title: 'Letra Grande (115%)', size: '0.8rem' },
+                                { id: 'xlarge', label: 'A++', title: 'Letra Muy Grande (130%)', size: '0.86rem' },
+                            ].map(opt => {
+                                const active = fontSizeMode === opt.id;
+                                return (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => handleFontSizeChange(opt.id)}
+                                        title={opt.title}
+                                        style={{
+                                            padding: '3px 8px',
+                                            borderRadius: '14px',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontSize: opt.size,
+                                            fontWeight: 700,
+                                            lineHeight: 1.2,
+                                            background: active ? 'var(--primary-600, #0284C7)' : 'transparent',
+                                            color: active ? '#FFFFFF' : 'var(--neutral-600)',
+                                            transition: 'all 0.15s',
+                                        }}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
                         <span className="topbar__date">
                             {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </span>
