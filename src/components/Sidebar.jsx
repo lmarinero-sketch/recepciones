@@ -4,7 +4,7 @@ import {
     ChevronDown, Home, MessageSquareText, MessageCircle,
     Brain, HeartPulse, RefreshCw, BarChart3, Bell, ClipboardCheck,
     Building2, FileText, DollarSign, LayoutDashboard, UserPlus, FolderClock, Megaphone, X,
-    HeartHandshake,
+    HeartHandshake, TrendingUp,
 } from 'lucide-react';
 
 export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile, activeView, onViewChange, unreadMessageCount = 0 }) {
@@ -16,6 +16,7 @@ export default function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile
         { id: 'mensajeria', label: 'Chat Central', icon: MessageCircle },
         { id: 'plantillas', label: 'Plantillas', icon: MessageSquareText },
         { id: 'metricas_mensajeria', label: 'Métricas Mensajería', icon: BarChart3 },
+        { id: 'conversion_whatsapp', label: 'Conversión a Turnos', icon: TrendingUp },
     ];
 
     const isMensajeriaActive = mensajeriaSubItems.some(i => activeView === i.id);
