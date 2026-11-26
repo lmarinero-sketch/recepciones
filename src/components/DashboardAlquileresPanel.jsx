@@ -1,25 +1,30 @@
 /**
- * DashboardAlquileresPanel — Dashboard ejecutivo de métricas de ocupación
- * 
- * Muestra: Tasa general, distribución por franja, sede, y KPIs principales.
- * Incluye visualizaciones con barras de progreso y sparklines CSS.
+ * DashboardAlquileresPanel — Dashboard ejecutivo de ocupación de consultorios
+ * Unificado bajo el sistema de diseño analítico ("Menos es más" — Figma SaaS / Calidad-QOAG)
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-    BarChart3, Calendar, ChevronLeft, ChevronRight, Loader2,
-    RefreshCw, Building2, TrendingUp, Users, Home, Clock,
-    ArrowUpRight, ArrowDownRight,
+    BarChart3, Calendar, ChevronLeft, ChevronRight,
+    Building2, Users, Home, ArrowUpRight, LayoutDashboard
 } from 'lucide-react';
+import {
+    ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+    PieChart, Pie, Cell, Legend
+} from 'recharts';
 import {
     fetchSedes, fetchConsultorios, fetchAsignaciones,
     buildGrilla, calcularMetricasLocal, fetchMedicos,
-    fetchNovedades, fetchLiquidacion, getPeriodoActual,
-    DIAS, FRANJAS, DIAS_LABELS, FRANJAS_LABELS,
+    fetchNovedades, getPeriodoActual,
 } from '../services/alquileresService';
+import {
+    AnalyticsShell, AnalyticsKpiCard, AnalyticsCard,
+    RefreshButton, AnalyticsLoader, EmptyChartState,
+    ANALYTICS_PALETTE, TOOLTIP_STYLE,
+} from './ui/AnalyticsPrimitives';
 
 function parsePeriodo(p) { const [y, m] = p.split('-').map(Number); return { year: y, month: m }; }
 function formatPeriodo(p) {
-    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const { year, month } = parsePeriodo(p);
     return `${meses[month - 1]} ${year}`;
 }
@@ -36,7 +41,7 @@ export default function DashboardAlquileresPanel({ addToast }) {
     const [metricsPerSede, setMetricsPerSede] = useState({});
     const [totalMedicos, setTotalMedicos] = useState(0);
     const [novedadesCount, setNovedadesCount] = useState({ alta: 0, baja: 0 });
-    const [franjaDistrib, setFranjaDistrib] = useState({});
+    const [franjaDistrib, setFranjaDistrib] = useState({ mañana: 0, siesta: 0, tarde: 0 });
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -45,7 +50,7 @@ export default function DashboardAlquileresPanel({ addToast }) {
             setSedes(sedesData);
 
             const allMetrics = {};
-            let globalFranjas = { 'mañana': 0, siesta: 0, tarde: 0 };
+            const globalFranjas = { mañana: 0, siesta: 0, tarde: 0 };
 
             for (const sede of sedesData) {
                 const [cons, asig] = await Promise.all([
@@ -55,8 +60,6 @@ export default function DashboardAlquileresPanel({ addToast }) {
                 const grilla = buildGrilla(asig, cons);
                 const metrics = calcularMetricasLocal(grilla, cons);
                 allMetrics[sede.id] = { ...metrics, nombre: sede.nombre, codigo: sede.codigo, consultorios: cons };
-
-                // Count franjas
                 asig.forEach(a => {
                     if (globalFranjas[a.franja] !== undefined) globalFranjas[a.franja]++;
                 });
@@ -65,16 +68,15 @@ export default function DashboardAlquileresPanel({ addToast }) {
             setMetricsPerSede(allMetrics);
             setFranjaDistrib(globalFranjas);
 
-            // Medicos count
-            const medicos = await fetchMedicos({ estado: 'activo' });
+            const [medicos, novedades] = await Promise.all([
+                fetchMedicos({ estado: 'activo' }),
+                fetchNovedades(periodo),
+            ]);
             setTotalMedicos(medicos.length);
 
-            // Novedades count
-            const novedades = await fetchNovedades(periodo);
             const nc = { alta: 0, baja: 0 };
             novedades.forEach(n => { if (nc[n.tipo] !== undefined) nc[n.tipo]++; });
             setNovedadesCount(nc);
-
         } catch (err) {
             addToast?.('Error cargando dashboard: ' + err.message, 'error');
         } finally {
@@ -84,7 +86,6 @@ export default function DashboardAlquileresPanel({ addToast }) {
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    // Global totals
     const globalMetrics = useMemo(() => {
         let disponible = 0, ocupado = 0;
         Object.values(metricsPerSede).forEach(m => {
@@ -94,153 +95,194 @@ export default function DashboardAlquileresPanel({ addToast }) {
         return { disponible, ocupado, libre: disponible - ocupado, tasa: disponible > 0 ? Math.round((ocupado / disponible) * 100) : 0 };
     }, [metricsPerSede]);
 
-    const totalFranjas = useMemo(() => {
-        return Object.values(franjaDistrib).reduce((a, b) => a + b, 0);
-    }, [franjaDistrib]);
+    const sedeChartData = useMemo(() => (
+        sedes.map(s => {
+            const m = metricsPerSede[s.id];
+            if (!m) return null;
+            return { sede: s.nombre, ocupados: m.totalOcupado, libres: m.totalLibre, tasa: m.tasaGeneral };
+        }).filter(Boolean)
+    ), [sedes, metricsPerSede]);
 
-    if (loading) {
-        return (
-            <div className="content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-                <Loader2 size={32} className="spin" style={{ color: 'var(--primary-500)' }} />
-            </div>
-        );
-    }
+    const franjaPieData = useMemo(() => ([
+        { name: 'Mañana', value: franjaDistrib.mañana || 0, color: ANALYTICS_PALETTE.blue },
+        { name: 'Siesta', value: franjaDistrib.siesta || 0, color: ANALYTICS_PALETTE.amber },
+        { name: 'Tarde', value: franjaDistrib.tarde || 0, color: ANALYTICS_PALETTE.emerald },
+    ].filter(x => x.value > 0)), [franjaDistrib]);
 
     return (
-        <div className="content" style={{ padding: '24px' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button onClick={() => setPeriodo(p => shiftPeriodo(p, -1))} style={iconBtn}><ChevronLeft size={16} /></button>
-                    <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--neutral-700)' }}>
-                        <Calendar size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                        {formatPeriodo(periodo)}
-                    </span>
-                    <button onClick={() => setPeriodo(p => shiftPeriodo(p, 1))} style={iconBtn}><ChevronRight size={16} /></button>
-                    <button onClick={loadData} style={iconBtn}><RefreshCw size={14} /></button>
-                </div>
-            </div>
+        <AnalyticsShell
+            icon={LayoutDashboard}
+            title="Dashboard de Alquileres y Ocupación"
+            subtitle="Tasa de ocupación mensual de consultorios por sede, franja horaria y movimiento de médicos."
+            controls={
+                <>
+                    <div style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                        background: '#F8FAFC', border: '1px solid #E2E8F0',
+                        borderRadius: '9px', padding: '3px 6px',
+                    }}>
+                        <button onClick={() => setPeriodo(p => shiftPeriodo(p, -1))} style={navBtn} title="Mes anterior">
+                            <ChevronLeft size={15} />
+                        </button>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0F172A', padding: '0 6px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <Calendar size={13} color="#0284C7" />
+                            {formatPeriodo(periodo)}
+                        </span>
+                        <button onClick={() => setPeriodo(p => shiftPeriodo(p, 1))} style={navBtn} title="Mes siguiente">
+                            <ChevronRight size={15} />
+                        </button>
+                    </div>
+                    <RefreshButton onClick={loadData} loading={loading} />
+                </>
+            }
+        >
+            {loading ? (
+                <AnalyticsLoader text="Calculando ocupación de consultorios..." />
+            ) : (
+                <>
+                    {/* 4 KPI Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                        <AnalyticsKpiCard
+                            label="Ocupación General"
+                            value={`${globalMetrics.tasa}%`}
+                            pill={`${globalMetrics.ocupado} / ${globalMetrics.disponible}`}
+                            subtext="Porcentaje de módulos ocupados sobre capacidad total."
+                            icon={BarChart3}
+                            accent={globalMetrics.tasa >= 80 ? ANALYTICS_PALETTE.emerald : globalMetrics.tasa >= 60 ? ANALYTICS_PALETTE.amber : ANALYTICS_PALETTE.rose}
+                            bg={globalMetrics.tasa >= 80 ? '#ECFDF5' : globalMetrics.tasa >= 60 ? '#FFFBEB' : '#FFF1F2'}
+                        />
+                        <AnalyticsKpiCard
+                            label="Médicos Activos"
+                            value={totalMedicos}
+                            subtext="Profesionales con alquiler vigente en el sistema."
+                            icon={Users}
+                            accent={ANALYTICS_PALETTE.blue}
+                            bg="#F0F9FF"
+                        />
+                        <AnalyticsKpiCard
+                            label="Módulos Libres"
+                            value={globalMetrics.libre}
+                            subtext={`Disponibles para asignar de ${globalMetrics.disponible} totales.`}
+                            icon={Home}
+                            accent={ANALYTICS_PALETTE.slate}
+                            bg="#F1F5F9"
+                        />
+                        <AnalyticsKpiCard
+                            label="Novedades del Período"
+                            value={novedadesCount.alta}
+                            pill={`${novedadesCount.baja} bajas`}
+                            pillBg={novedadesCount.baja > 0 ? '#FEE2E2' : '#ECFDF5'}
+                            pillColor={novedadesCount.baja > 0 ? '#B91C1C' : '#15803D'}
+                            subtext="Altas registradas durante el mes seleccionado."
+                            icon={ArrowUpRight}
+                            accent={ANALYTICS_PALETTE.emerald}
+                            bg="#ECFDF5"
+                        />
+                    </div>
 
-            {/* KPI Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-                <KPICard icon={<BarChart3 size={20} />} label="Ocupación General" value={`${globalMetrics.tasa}%`} subtext={`${globalMetrics.ocupado} / ${globalMetrics.disponible} slots`} accent={globalMetrics.tasa >= 80 ? '#22C55E' : globalMetrics.tasa >= 60 ? '#F59E0B' : '#EF4444'} />
-                <KPICard icon={<Users size={20} />} label="Médicos Activos" value={totalMedicos} subtext="En el sistema" accent="var(--primary-500)" />
-                <KPICard icon={<Home size={20} />} label="Slots Libres" value={globalMetrics.libre} subtext={`De ${globalMetrics.disponible} totales`} accent="#94A3B8" />
-                <KPICard icon={<ArrowUpRight size={20} />} label="Altas este mes" value={novedadesCount.alta} subtext={`${novedadesCount.baja} bajas`} accent="#22C55E" />
-            </div>
+                    {/* Gráficos: Barras por Sede + Torta por Franja */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(300px, 1fr)', gap: '20px' }}>
+                        <AnalyticsCard
+                            title="Ocupados vs. Libres por Sede"
+                            subtitle="Comparativa visual de capacidad utilizada en cada edificio"
+                            explanation="Permite detectar en qué sede existe capacidad ociosa disponible para incorporar nuevos profesionales."
+                        >
+                            {sedeChartData.length > 0 ? (
+                                <div style={{ height: '250px', width: '100%' }}>
+                                    <ResponsiveContainer>
+                                        <BarChart data={sedeChartData} margin={{ top: 8, right: 12, left: -14, bottom: 4 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                                            <XAxis dataKey="sede" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                            <Tooltip contentStyle={TOOLTIP_STYLE} />
+                                            <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
+                                            <Bar dataKey="ocupados" name="Ocupados" stackId="a" fill={ANALYTICS_PALETTE.blue} />
+                                            <Bar dataKey="libres" name="Libres" stackId="a" fill="#CBD5E1" radius={[5, 5, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : <EmptyChartState />}
+                        </AnalyticsCard>
 
-            {/* Sede breakdown */}
-            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: '12px', color: 'var(--neutral-700)' }}>
-                <Building2 size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                Ocupación por Sede
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-                {sedes.map(s => {
-                    const m = metricsPerSede[s.id];
-                    if (!m) return null;
-                    return (
-                        <div key={s.id} style={{
-                            padding: '16px 20px', borderRadius: '12px',
-                            border: '1px solid var(--neutral-200)', background: 'white',
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                <span style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--neutral-700)' }}>{s.nombre}</span>
-                                <span style={{
-                                    fontWeight: 800, fontSize: '1.1rem',
-                                    color: m.tasaGeneral >= 80 ? '#22C55E' : m.tasaGeneral >= 60 ? '#F59E0B' : '#EF4444',
-                                }}>{m.tasaGeneral}%</span>
-                            </div>
-                            {/* Progress bar */}
-                            <div style={{ height: '8px', borderRadius: '4px', background: 'var(--neutral-100)', marginBottom: '8px' }}>
-                                <div style={{
-                                    height: '100%', borderRadius: '4px', transition: 'width 0.6s ease',
-                                    width: `${m.tasaGeneral}%`,
-                                    background: m.tasaGeneral >= 80 ? 'linear-gradient(90deg, #22C55E, #16A34A)' : m.tasaGeneral >= 60 ? 'linear-gradient(90deg, #F59E0B, #D97706)' : 'linear-gradient(90deg, #EF4444, #DC2626)',
-                                }} />
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--neutral-500)' }}>
-                                <span>Ocupados: {m.totalOcupado}</span>
-                                <span>Libres: {m.totalLibre}</span>
-                                <span>Total: {m.totalDisponible}</span>
-                            </div>
+                        <AnalyticsCard
+                            title="Distribución por Franja Horaria"
+                            subtitle="Participación de módulos asignados en Mañana, Siesta y Tarde"
+                            explanation="Ayuda a identificar franjas horarias con menor ocupación (como Siesta) para ofrecer incentivos o promociones."
+                        >
+                            {franjaPieData.length > 0 ? (
+                                <div style={{ height: '250px', width: '100%' }}>
+                                    <ResponsiveContainer>
+                                        <PieChart>
+                                            <Pie data={franjaPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={86} paddingAngle={3}>
+                                                {franjaPieData.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
+                                            </Pie>
+                                            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => [`${v} módulos`, 'Asignados']} />
+                                            <Legend wrapperStyle={{ fontSize: '0.76rem' }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : <EmptyChartState text="Sin módulos asignados en este período." />}
+                        </AnalyticsCard>
+                    </div>
 
-                            {/* Per-consultorio mini bars */}
-                            <div style={{ marginTop: '12px', display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                                {Object.entries(m.porConsultorio).map(([cid, cm]) => (
-                                    <div key={cid} title={`Cons. ${m.consultorios?.find(x => x.id === cid)?.numero || '?'}: ${cm.tasa}%`} style={{
-                                        width: '18px', height: '18px', borderRadius: '4px',
-                                        background: cm.tasa >= 90 ? '#22C55E' : cm.tasa >= 70 ? '#FDE68A' : cm.tasa >= 40 ? '#FED7AA' : '#FECACA',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: '0.5rem', fontWeight: 700, color: cm.tasa >= 90 ? 'white' : 'var(--neutral-600)',
-                                        cursor: 'default',
+                    {/* Mapa por Consultorio en cada Sede */}
+                    <AnalyticsCard
+                        title="Mapa de Ocupación por Consultorio"
+                        subtitle="Detalle individual por consultorio (verde ≥ 90% · amarillo ≥ 70% · naranja ≥ 40% · rojo < 40%)"
+                    >
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                            {sedes.map(s => {
+                                const m = metricsPerSede[s.id];
+                                if (!m) return null;
+                                const barColor = m.tasaGeneral >= 80 ? ANALYTICS_PALETTE.emerald : m.tasaGeneral >= 60 ? ANALYTICS_PALETTE.amber : ANALYTICS_PALETTE.rose;
+                                return (
+                                    <div key={s.id} style={{
+                                        padding: '16px', borderRadius: '11px',
+                                        border: '1px solid #E2E8F0', background: '#F8FAFC',
                                     }}>
-                                        {m.consultorios?.find(x => x.id === cid)?.numero || ''}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                            <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <Building2 size={15} color="#0284C7" /> {s.nombre}
+                                            </span>
+                                            <span style={{ fontWeight: 800, fontSize: '1.05rem', color: barColor }}>{m.tasaGeneral}%</span>
+                                        </div>
+                                        <div style={{ height: '7px', borderRadius: '999px', background: '#E2E8F0', marginBottom: '8px', overflow: 'hidden' }}>
+                                            <div style={{ height: '100%', width: `${m.tasaGeneral}%`, background: barColor, borderRadius: '999px', transition: 'width 0.5s ease' }} />
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748B', marginBottom: '10px' }}>
+                                            <span>Ocupados: <strong>{m.totalOcupado}</strong></span>
+                                            <span>Libres: <strong>{m.totalLibre}</strong></span>
+                                            <span>Total: <strong>{m.totalDisponible}</strong></span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                            {Object.entries(m.porConsultorio).map(([cid, cm]) => {
+                                                const num = m.consultorios?.find(x => x.id === cid)?.numero || '?';
+                                                return (
+                                                    <div key={cid} title={`Consultorio ${num}: ${cm.tasa}%`} style={{
+                                                        width: '22px', height: '22px', borderRadius: '5px',
+                                                        background: cm.tasa >= 90 ? '#10B981' : cm.tasa >= 70 ? '#FDE68A' : cm.tasa >= 40 ? '#FED7AA' : '#FECACA',
+                                                        color: cm.tasa >= 90 ? '#FFFFFF' : '#334155',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: '0.62rem', fontWeight: 700,
+                                                    }}>
+                                                        {num}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
+                                );
+                            })}
                         </div>
-                    );
-                })}
-            </div>
-
-            {/* Franja distribution */}
-            <h3 style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: '12px', color: 'var(--neutral-700)' }}>
-                <Clock size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                Distribución por Franja Horaria
-            </h3>
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-                {[
-                    { key: 'mañana', label: 'Mañana', color: '#3B82F6', bg: '#EFF6FF' },
-                    { key: 'siesta', label: 'Siesta', color: '#F59E0B', bg: '#FFFBEB' },
-                    { key: 'tarde', label: 'Tarde', color: '#22C55E', bg: '#F0FDF4' },
-                ].map(f => {
-                    const count = franjaDistrib[f.key] || 0;
-                    const pct = totalFranjas > 0 ? Math.round((count / totalFranjas) * 100) : 0;
-                    return (
-                        <div key={f.key} style={{
-                            flex: 1, padding: '16px 20px', borderRadius: '12px',
-                            border: `1px solid ${f.color}22`, background: f.bg,
-                        }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.82rem', color: f.color, marginBottom: '4px' }}>{f.label}</div>
-                            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--neutral-800)' }}>{count}</div>
-                            <div style={{ height: '6px', borderRadius: '3px', background: `${f.color}20`, marginTop: '8px' }}>
-                                <div style={{ height: '100%', borderRadius: '3px', width: `${pct}%`, background: f.color, transition: 'width 0.5s ease' }} />
-                            </div>
-                            <div style={{ fontSize: '0.68rem', color: 'var(--neutral-500)', marginTop: '4px' }}>{pct}% del total</div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
+                    </AnalyticsCard>
+                </>
+            )}
+        </AnalyticsShell>
     );
 }
 
-function KPICard({ icon, label, value, subtext, accent }) {
-    return (
-        <div style={{
-            padding: '16px 20px', borderRadius: '12px',
-            border: '1px solid var(--neutral-200)', background: 'white',
-            display: 'flex', alignItems: 'flex-start', gap: '14px',
-        }}>
-            <div style={{
-                width: '40px', height: '40px', borderRadius: '10px',
-                background: `${accent}15`, display: 'flex', alignItems: 'center',
-                justifyContent: 'center', color: accent, flexShrink: 0,
-            }}>
-                {icon}
-            </div>
-            <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--neutral-500)', fontWeight: 500, marginBottom: '2px' }}>{label}</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--neutral-800)', lineHeight: 1 }}>{value}</div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--neutral-400)', marginTop: '4px' }}>{subtext}</div>
-            </div>
-        </div>
-    );
-}
-
-const iconBtn = {
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: '30px', height: '30px', borderRadius: '8px',
-    border: '1px solid var(--neutral-200)', background: 'white',
-    cursor: 'pointer', color: 'var(--neutral-500)',
+const navBtn = {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: '26px', height: '26px', borderRadius: '6px',
+    border: 'none', background: '#FFFFFF', cursor: 'pointer', color: '#475569',
 };

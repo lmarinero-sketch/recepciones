@@ -1,16 +1,20 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-    BarChart3, TrendingUp, Users, Calendar, Loader2, RefreshCw,
-    Building2, UserCheck, UserX, CalendarDays, Clock, FileText, ClipboardCheck
+    BarChart3, TrendingUp, Users, Building2, UserCheck, UserX,
+    CalendarDays, Clock, FileText, ClipboardCheck, Table2
 } from 'lucide-react';
 import {
     ComposedChart, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Area, PieChart, Pie, Cell, Legend, ReferenceLine
 } from 'recharts';
 import { fetchRecordatoriosMetrics } from '../services/recordatoriosService';
+import {
+    AnalyticsShell, AnalyticsKpiCard, AnalyticsCard, SegmentedControl,
+    RefreshButton, AnalyticsLoader, EmptyChartState,
+    ANALYTICS_PALETTE, CHART_SERIES_COLORS, TOOLTIP_STYLE, selectInputStyle, dateInputStyle,
+} from './ui/AnalyticsPrimitives';
 
-const MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-const COLORS = ['#0284c7','#10b981','#f59e0b','#8b5cf6','#ec4899','#64748b'];
+const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 const isExcludedMedico = (name) => {
     if (!name) return true;
@@ -29,61 +33,26 @@ function isInformeRow(r) {
     return tv.includes('INFORME') || tv.includes('CHQ INF');
 }
 
-function StatCard({ icon: Icon, label, value, sub, color, bg }) {
-    return (
-        <div style={{
-            background: '#fff', borderRadius: '14px', padding: '16px 18px',
-            border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '14px',
-            transition: 'all .2s', cursor: 'default',
-        }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,.06)'; e.currentTarget.style.borderColor = color + '40'; }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-        >
-            <div style={{
-                width: '44px', height: '44px', borderRadius: '12px',
-                background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            }}>
-                <Icon size={21} color={color} />
-            </div>
-            <div>
-                <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#1e293b', lineHeight: 1.1 }}>{value}</div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>{label}</div>
-                {sub && <div style={{ fontSize: '0.68rem', color: color, fontWeight: 700, marginTop: '2px' }}>{sub}</div>}
-            </div>
-        </div>
-    );
-}
-
 function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos', customMin = '', customMax = '', tipoConsulta = 'preventivo') {
     const byMonth = {};
     const osCounts = {};
     const medicoCounts = {};
     const sedeCounts = {};
-    const ageCounts = {
-        '< 14': 0,
-        '14 - 17': 0,
-        '18 - 50': 0,
-        '51 - 65': 0,
-        '66+': 0,
-        'Sin Dato': 0,
-    };
-    let totalPresentes = 0, totalAusentes = 0, totalPendientes = 0;
-    let filteredCount = 0;
+    const ageCounts = { '< 14': 0, '14 - 17': 0, '18 - 50': 0, '51 - 65': 0, '66+': 0, 'Sin Dato': 0 };
+    let totalPresentes = 0, totalAusentes = 0, totalPendientes = 0, filteredCount = 0;
 
-    // También calculamos métricas cruzadas de Informe vs Chequeo en el mismo rango
     const chqPresenteDnis = new Set();
     const infPresenteDnis = new Set();
     const infAgendadoDnis = new Set();
     const chqDatesByDni = {};
     const infDatesByDni = {};
-
     const uniqueVisitsMap = new Map();
+
     data.forEach(r => {
         if (!r.fecha) return;
         if (fechaDesde && r.fecha < fechaDesde) return;
         if (fechaHasta && r.fecha > fechaHasta) return;
 
-        // Filtro por rango etario
         if (filtroEdad !== 'todos') {
             const age = r.edad !== null && r.edad !== undefined && r.edad !== '' ? parseInt(r.edad, 10) : null;
             if (age === null || isNaN(age)) return;
@@ -107,21 +76,14 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos', customMin
                 infAgendadoDnis.add(`${dniKey}_${r.fecha}`);
                 if (r.asistencia_efectiva === 'Presente') {
                     infPresenteDnis.add(dniKey);
-                    if (!infDatesByDni[dniKey] || r.fecha > infDatesByDni[dniKey]) {
-                        infDatesByDni[dniKey] = r.fecha;
-                    }
+                    if (!infDatesByDni[dniKey] || r.fecha > infDatesByDni[dniKey]) infDatesByDni[dniKey] = r.fecha;
                 }
-            } else {
-                if (r.asistencia_efectiva === 'Presente') {
-                    chqPresenteDnis.add(dniKey);
-                    if (!chqDatesByDni[dniKey] || r.fecha < chqDatesByDni[dniKey]) {
-                        chqDatesByDni[dniKey] = r.fecha;
-                    }
-                }
+            } else if (r.asistencia_efectiva === 'Presente') {
+                chqPresenteDnis.add(dniKey);
+                if (!chqDatesByDni[dniKey] || r.fecha < chqDatesByDni[dniKey]) chqDatesByDni[dniKey] = r.fecha;
             }
         }
 
-        // Filtrar según tipoConsulta seleccionado
         if (tipoConsulta === 'preventivo' && isInf) return;
         if (tipoConsulta === 'informe' && !isInf) return;
 
@@ -130,34 +92,23 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos', customMin
             uniqueVisitsMap.set(key, { ...r, isInf });
         } else {
             const existing = uniqueVisitsMap.get(key);
-            if (r.asistencia_efectiva === 'Presente') {
-                existing.asistencia_efectiva = 'Presente';
-            }
+            if (r.asistencia_efectiva === 'Presente') existing.asistencia_efectiva = 'Presente';
         }
     });
 
-    // Calcular días promedio entre Chequeo Preventivo y Consulta de Informe
-    let sumDiasInforme = 0;
-    let countDiasInforme = 0;
+    let sumDiasInforme = 0, countDiasInforme = 0;
     Object.keys(infDatesByDni).forEach(dni => {
         const fChq = chqDatesByDni[dni];
         const fInf = infDatesByDni[dni];
         if (fChq && fInf && fInf >= fChq) {
             const diff = Math.round((new Date(fInf + 'T12:00:00') - new Date(fChq + 'T12:00:00')) / (1000 * 60 * 60 * 24));
-            if (diff >= 0 && diff <= 120) {
-                sumDiasInforme += diff;
-                countDiasInforme++;
-            }
+            if (diff >= 0 && diff <= 120) { sumDiasInforme += diff; countDiasInforme++; }
         }
     });
     const avgDiasAlInforme = countDiasInforme > 0 ? Math.round(sumDiasInforme / countDiasInforme) : 0;
-    const tasaRetornoInforme = chqPresenteDnis.size > 0
-        ? Math.round((infPresenteDnis.size / chqPresenteDnis.size) * 100)
-        : 0;
+    const tasaRetornoInforme = chqPresenteDnis.size > 0 ? Math.round((infPresenteDnis.size / chqPresenteDnis.size) * 100) : 0;
 
-    const uniqueVisits = Array.from(uniqueVisitsMap.values());
-
-    uniqueVisits.forEach(r => {
+    Array.from(uniqueVisitsMap.values()).forEach(r => {
         filteredCount++;
         const asis = r.asistencia_efectiva;
         const isAusente = asis === 'Ausente' || asis === 'Ausencia justificada' || asis === 'Ausencia injustificada' || asis === 'Anulación Cita Online';
@@ -168,10 +119,7 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos', customMin
 
         const month = r.fecha.substring(0, 7);
         if (!byMonth[month]) {
-            byMonth[month] = {
-                agendados: 0, presentes: 0, ausentes: 0, pendientes: 0,
-                chqPresentes: 0, infPresentes: 0, infAgendados: 0, infAusentes: 0
-            };
+            byMonth[month] = { agendados: 0, presentes: 0, ausentes: 0, pendientes: 0, chqPresentes: 0, infPresentes: 0, infAgendados: 0, infAusentes: 0 };
         }
         byMonth[month].agendados++;
         if (asis === 'Presente') byMonth[month].presentes++;
@@ -182,35 +130,27 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos', customMin
             byMonth[month].infAgendados++;
             if (asis === 'Presente') byMonth[month].infPresentes++;
             else if (isAusente) byMonth[month].infAusentes++;
-        } else {
-            if (asis === 'Presente') byMonth[month].chqPresentes++;
+        } else if (asis === 'Presente') {
+            byMonth[month].chqPresentes++;
         }
 
         if (asis === 'Presente') {
             const os = r.obra_social || 'Particular/Sin OS';
             osCounts[os] = (osCounts[os] || 0) + 1;
-
             const sede = r.centro || 'Sin Sede';
             sedeCounts[sede] = (sedeCounts[sede] || 0) + 1;
-
-            if (r.medico && !isExcludedMedico(r.medico)) {
-                medicoCounts[r.medico] = (medicoCounts[r.medico] || 0) + 1;
-            }
+            if (r.medico && !isExcludedMedico(r.medico)) medicoCounts[r.medico] = (medicoCounts[r.medico] || 0) + 1;
 
             if (r.edad !== null && r.edad !== undefined && r.edad !== '') {
                 const age = parseInt(r.edad, 10);
                 if (!isNaN(age)) {
                     if (age < 14) ageCounts['< 14']++;
-                    else if (age >= 14 && age <= 17) ageCounts['14 - 17']++;
-                    else if (age >= 18 && age <= 50) ageCounts['18 - 50']++;
-                    else if (age >= 51 && age <= 65) ageCounts['51 - 65']++;
-                    else if (age >= 66) ageCounts['66+']++;
-                } else {
-                    ageCounts['Sin Dato']++;
-                }
-            } else {
-                ageCounts['Sin Dato']++;
-            }
+                    else if (age <= 17) ageCounts['14 - 17']++;
+                    else if (age <= 50) ageCounts['18 - 50']++;
+                    else if (age <= 65) ageCounts['51 - 65']++;
+                    else ageCounts['66+']++;
+                } else ageCounts['Sin Dato']++;
+            } else ageCounts['Sin Dato']++;
         }
     });
 
@@ -229,73 +169,42 @@ function aggregate(data, fechaDesde, fechaHasta, filtroEdad = 'todos', customMin
         };
     });
 
-    const topOS = Object.entries(osCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({ name, value }));
-    const othersOS = Object.entries(osCounts).sort((a, b) => b[1] - a[1]).slice(5).reduce((s, [, c]) => s + c, 0);
+    const sortedOS = Object.entries(osCounts).sort((a, b) => b[1] - a[1]);
+    const topOS = sortedOS.slice(0, 5).map(([name, value]) => ({ name, value }));
+    const othersOS = sortedOS.slice(5).reduce((s, [, c]) => s + c, 0);
     if (othersOS > 0) topOS.push({ name: 'Otras', value: othersOS });
 
-    const topMedicos = Object.entries(medicoCounts).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
+    const topMedicos = Object.entries(medicoCounts).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([name, value]) => ({ name, value }));
     const topSedes = Object.entries(sedeCounts).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
 
-    const AGE_COLORS = {
-        '< 14': '#06b6d4',
-        '14 - 17': '#3b82f6',
-        '18 - 50': '#10b981',
-        '51 - 65': '#f59e0b',
-        '66+': '#8b5cf6',
-        'Sin Dato': '#cbd5e1',
-    };
-
-    const ageDistribution = Object.entries(ageCounts)
-        .filter(([, value]) => value > 0)
-        .map(([name, value]) => ({ name, value, color: AGE_COLORS[name] || '#64748b' }));
-
-    const tasaGlobal = (totalPresentes + totalAusentes) > 0
-        ? Math.round((totalPresentes / (totalPresentes + totalAusentes)) * 100) : 0;
+    const AGE_COLORS = { '< 14': '#0EA5E9', '14 - 17': '#6366F1', '18 - 50': '#10B981', '51 - 65': '#F59E0B', '66+': '#8B5CF6', 'Sin Dato': '#CBD5E1' };
+    const ageDistribution = Object.entries(ageCounts).filter(([, value]) => value > 0).map(([name, value]) => ({ name, value, color: AGE_COLORS[name] || '#64748B' }));
+    const tasaGlobal = (totalPresentes + totalAusentes) > 0 ? Math.round((totalPresentes / (totalPresentes + totalAusentes)) * 100) : 0;
 
     return {
-        months,
-        topOS,
-        topMedicos,
-        topSedes,
-        ageDistribution,
-        totalPresentes,
-        totalAusentes,
-        totalPendientes,
-        total: filteredCount,
-        tasaGlobal,
-        chqPresentesCount: chqPresenteDnis.size,
-        infPresentesCount: infPresenteDnis.size,
-        infAgendadosCount: infAgendadoDnis.size,
-        tasaRetornoInforme,
-        avgDiasAlInforme,
+        months, topOS, topMedicos, topSedes, ageDistribution,
+        totalPresentes, totalAusentes, totalPendientes, total: filteredCount,
+        tasaGlobal, chqPresentesCount: chqPresenteDnis.size, infPresentesCount: infPresenteDnis.size,
+        infAgendadosCount: infAgendadoDnis.size, tasaRetornoInforme, avgDiasAlInforme,
     };
 }
 
 function aggregateYoY(data, modo = 'agendados', filtroEdad = 'todos', customMin = '', customMax = '', tipoConsulta = 'preventivo') {
     const byMonth = {};
     const uniqueVisitsMap = new Map();
-
     data.forEach(r => {
         if (!r.fecha) return;
         const isInf = isInformeRow(r);
         if (tipoConsulta === 'preventivo' && isInf) return;
         if (tipoConsulta === 'informe' && !isInf) return;
-
         const key = `${r.dni || r.paciente}_${r.fecha}_${isInf ? 'INF' : 'CHQ'}`;
-        if (!uniqueVisitsMap.has(key)) {
-            uniqueVisitsMap.set(key, { ...r });
-        } else {
-            const existing = uniqueVisitsMap.get(key);
-            if (r.asistencia_efectiva === 'Presente') {
-                existing.asistencia_efectiva = 'Presente';
-            }
-        }
+        if (!uniqueVisitsMap.has(key)) uniqueVisitsMap.set(key, { ...r });
+        else if (r.asistencia_efectiva === 'Presente') uniqueVisitsMap.get(key).asistencia_efectiva = 'Presente';
     });
 
     Array.from(uniqueVisitsMap.values()).forEach(r => {
         const asis = r.asistencia_efectiva;
         const isAusente = asis === 'Ausente' || asis === 'Ausencia justificada' || asis === 'Ausencia injustificada' || asis === 'Anulación Cita Online';
-
         if (modo === 'asistidos' && asis !== 'Presente') return;
         if (modo === 'ausentes' && !isAusente) return;
 
@@ -318,7 +227,6 @@ function aggregateYoY(data, modo = 'agendados', filtroEdad = 'todos', customMin 
         const [y, mo] = r.fecha.split('-');
         const monthIndex = parseInt(mo, 10) - 1;
         if (monthIndex < 0 || monthIndex > 11) return;
-
         if (!byMonth[monthIndex]) byMonth[monthIndex] = { name: MONTH_NAMES[monthIndex], index: monthIndex };
         byMonth[monthIndex][y] = (byMonth[monthIndex][y] || 0) + 1;
     });
@@ -330,12 +238,11 @@ function getPreviousMonthRange() {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-
     const pad = n => String(n).padStart(2, '0');
-    const fechaDesde = `${firstDay.getFullYear()}-${pad(firstDay.getMonth() + 1)}-01`;
-    const fechaHasta = `${lastDay.getFullYear()}-${pad(lastDay.getMonth() + 1)}-${pad(lastDay.getDate())}`;
-
-    return { fechaDesde, fechaHasta };
+    return {
+        fechaDesde: `${firstDay.getFullYear()}-${pad(firstDay.getMonth() + 1)}-01`,
+        fechaHasta: `${lastDay.getFullYear()}-${pad(lastDay.getMonth() + 1)}-${pad(lastDay.getDate())}`,
+    };
 }
 
 export default function MetricasRecordatoriosPanel({ addToast }) {
@@ -348,8 +255,9 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
     const [filtroEdad, setFiltroEdad] = useState('todos');
     const [customEdadMin, setCustomEdadMin] = useState('');
     const [customEdadMax, setCustomEdadMax] = useState('');
-    const [yoyMode, setYoyMode] = useState('asistidos'); // agendados | asistidos | ausentes
-    const [tipoConsulta, setTipoConsulta] = useState('informe'); // 'preventivo' | 'informe' | 'comparativa'
+    const [yoyMode, setYoyMode] = useState('asistidos');
+    const [tipoConsulta, setTipoConsulta] = useState('informe');
+    const [activeTab, setActiveTab] = useState('asistencia'); // 'asistencia' | 'demografia' | 'detalle'
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -367,9 +275,7 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
 
     const years = useMemo(() => {
         const ys = new Set();
-        rawData.forEach(v => {
-            if (v.fecha) ys.add(v.fecha.substring(0, 4));
-        });
+        rawData.forEach(v => { if (v.fecha) ys.add(v.fecha.substring(0, 4)); });
         return [...ys].sort().reverse();
     }, [rawData]);
 
@@ -381,510 +287,337 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
         () => aggregateYoY(rawData, yoyMode, filtroEdad, customEdadMin, customEdadMax, tipoConsulta),
         [rawData, yoyMode, filtroEdad, customEdadMin, customEdadMax, tipoConsulta]
     );
-
-    const avgAgendados = useMemo(() => {
-        return agg.months.length > 0 ? Math.round(agg.total / agg.months.length) : 0;
-    }, [agg.total, agg.months.length]);
-
-    if (loading) {
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', color: '#94a3b8' }}>
-                <Loader2 size={32} className="spin" />
-                <span style={{ marginTop: '10px', fontSize: '0.88rem' }}>Cargando estadísticas de chequeos y consultas de informe...</span>
-                {progress && <span style={{ marginTop: '4px', fontSize: '0.78rem', color: '#0284c7' }}>{progress}</span>}
-            </div>
-        );
-    }
+    const avgAgendados = useMemo(() => (agg.months.length > 0 ? Math.round(agg.total / agg.months.length) : 0), [agg.total, agg.months.length]);
 
     return (
-        <div style={{ padding: '24px', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f8fafc' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px', flexShrink: 0, flexWrap: 'wrap', gap: '12px' }}>
-                <div>
-                    <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'linear-gradient(135deg, #0284c7, #0369a1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <BarChart3 size={20} color="#fff" />
-                        </div>
-                        Estadísticas de Turnos: Chequeos Preventivos y Consultas de Informe
-                    </h2>
-                    <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '4px 0 0 48px', maxWidth: '720px' }}>
-                        Analiza la asistencia real a los estudios de <strong>(CHQ) CHEQUEO PREVENTIVO</strong> y a las consultas médicas de devolución de resultados <strong>(CHQ) CHEQUEO INFORME</strong> en SALUS.
-                    </p>
-                </div>
-
-                {/* Selector de Tipo de Consulta */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '3px' }}>
-                        {[
-                            { id: 'informe', label: '📋 Consultas de Informe (CHEQUEO INFORME)' },
-                            { id: 'preventivo', label: '🏥 Chequeos Preventivos (Estudios)' },
-                            { id: 'comparativa', label: '🔄 Comparativa Chequeo vs. Informe' },
-                        ].map(t => (
-                            <button
-                                key={t.id}
-                                onClick={() => setTipoConsulta(t.id)}
-                                style={{
-                                    padding: '7px 13px',
-                                    borderRadius: '7px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '0.77rem',
-                                    fontWeight: 700,
-                                    transition: 'all .15s',
-                                    background: tipoConsulta === t.id ? '#0284c7' : 'transparent',
-                                    color: tipoConsulta === t.id ? '#fff' : '#475569',
-                                }}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
+        <AnalyticsShell
+            icon={BarChart3}
+            title="Estadísticas de Turnos: Chequeos e Informes"
+            subtitle="Análisis de asistencia real, comparativa interanual 2024–2026 y perfil demográfico de pacientes en SALUS."
+            controls={
+                <>
+                    <SegmentedControl
+                        value={tipoConsulta}
+                        onChange={setTipoConsulta}
+                        options={[
+                            { id: 'informe', label: 'Consultas Informe' },
+                            { id: 'preventivo', label: 'Chequeos Preventivos' },
+                            { id: 'comparativa', label: 'Comparativa' },
+                        ]}
+                    />
+                    <RefreshButton onClick={loadData} loading={loading} />
+                </>
+            }
+            secondaryBar={
+                <>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748B' }}>Desde:</span>
+                        <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} style={dateInputStyle} />
                     </div>
-
-                    <button onClick={loadData} disabled={loading} style={{
-                        display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                        background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px',
-                        cursor: 'pointer', fontSize: '0.78rem', color: '#0f172a', fontWeight: 600,
-                    }}><RefreshCw size={14} /> Actualizar</button>
-                </div>
-            </div>
-
-            {/* Date & Age Filters */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap', background: '#fff', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Desde:</span>
-                    <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} style={{
-                        padding: '5px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.78rem', background: '#fff'
-                    }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Hasta:</span>
-                    <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} style={{
-                        padding: '5px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.78rem', background: '#fff'
-                    }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Rango Etario:</span>
-                    <select
-                        value={filtroEdad}
-                        onChange={e => setFiltroEdad(e.target.value)}
-                        style={{
-                            padding: '5px 10px', borderRadius: '6px', border: '1px solid #cbd5e1',
-                            color: '#0f172a', fontSize: '0.78rem', background: '#fff', fontWeight: 600, cursor: 'pointer'
-                        }}
-                    >
-                        <option value="todos">Todos los rangos</option>
-                        <option value="14-17">14 - 17 años (Adolescentes)</option>
-                        <option value="18-50">18 - 50 años (Adultos Jóvenes)</option>
-                        <option value="51-65">51 - 65 años (Adultos)</option>
-                        <option value="66+">66 en adelante (66+ años)</option>
-                        <option value="<14">Menores de 14 años (&lt; 14)</option>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748B' }}>Hasta:</span>
+                        <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} style={dateInputStyle} />
+                    </div>
+                    <select value={filtroEdad} onChange={e => setFiltroEdad(e.target.value)} style={selectInputStyle}>
+                        <option value="todos">Edad: Todas</option>
+                        <option value="<14">&lt; 14 años</option>
+                        <option value="14-17">14–17 años</option>
+                        <option value="18-50">18–50 años</option>
+                        <option value="51-65">51–65 años</option>
+                        <option value="66+">66+ años</option>
                         <option value="custom">Personalizado...</option>
                     </select>
-                </div>
-                {filtroEdad === 'custom' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '4px 10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                        <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>De:</span>
-                        <input
-                            type="number" min="0" max="120" placeholder="Min" value={customEdadMin}
-                            onChange={e => setCustomEdadMin(e.target.value)}
-                            style={{ width: '52px', padding: '4px 6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', textAlign: 'center', background: '#fff' }}
-                        />
-                        <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>a:</span>
-                        <input
-                            type="number" min="0" max="120" placeholder="Max" value={customEdadMax}
-                            onChange={e => setCustomEdadMax(e.target.value)}
-                            style={{ width: '52px', padding: '4px 6px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', textAlign: 'center', background: '#fff' }}
-                        />
-                    </div>
-                )}
-                <button onClick={() => {
-                    const prev = getPreviousMonthRange();
-                    setFechaDesde(prev.fechaDesde);
-                    setFechaHasta(prev.fechaHasta);
-                }} style={{
-                    padding: '5px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer'
-                }}>Mes anterior</button>
-                <button onClick={() => {
-                    setFechaDesde('2026-01-01');
-                    setFechaHasta('2026-12-31');
-                }} style={{
-                    padding: '5px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#eff6ff', color: '#0284c7', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer'
-                }}>Año 2026</button>
-                {(fechaDesde || fechaHasta || filtroEdad !== 'todos' || customEdadMin || customEdadMax) && (
-                    <button onClick={() => { setFechaDesde(''); setFechaHasta(''); setFiltroEdad('todos'); setCustomEdadMin(''); setCustomEdadMax(''); }} style={{
-                        padding: '5px 10px', borderRadius: '6px', border: 'none', background: '#fef2f2', color: '#dc2626', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer'
-                    }}>Ver Todo el Historial (2024–2026)</button>
-                )}
-            </div>
-
-            {/* KPI Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(195px, 1fr))', gap: '12px', marginBottom: '18px', flexShrink: 0 }}>
-                <StatCard
-                    icon={tipoConsulta === 'informe' ? FileText : CalendarDays}
-                    label={tipoConsulta === 'informe' ? 'Turnos de Informe Agendados' : tipoConsulta === 'preventivo' ? 'Turnos de Chequeo Agendados' : 'Total Turnos (CHQ + Informe)'}
-                    value={agg.total.toLocaleString()}
-                    sub={tipoConsulta === 'informe' ? 'Tipo: (CHQ) CHEQUEO INFORME' : tipoConsulta === 'preventivo' ? 'Tipo: (CHQ) CHEQUEO PREVENTIVO' : `${agg.infAgendadosCount.toLocaleString()} de Informe`}
-                    color="#0284c7"
-                    bg="#e0f2fe"
-                />
-                <StatCard
-                    icon={UserCheck}
-                    label={tipoConsulta === 'informe' ? 'Informes Entregados (Presentes)' : 'Presentes (Asistieron)'}
-                    value={agg.totalPresentes.toLocaleString()}
-                    sub={`${agg.tasaGlobal}% tasa de asistencia efectiva`}
-                    color="#10b981"
-                    bg="#ecfdf5"
-                />
-                <StatCard
-                    icon={UserX}
-                    label="Ausentes / Inasistencias"
-                    value={agg.totalAusentes.toLocaleString()}
-                    sub={`${agg.totalPresentes + agg.totalAusentes > 0 ? 100 - agg.tasaGlobal : 0}% inasistencia`}
-                    color="#ef4444"
-                    bg="#fef2f2"
-                />
-                <StatCard
-                    icon={ClipboardCheck}
-                    label="Retorno a Consulta Informe"
-                    value={`${agg.tasaRetornoInforme}%`}
-                    sub={`${agg.infPresentesCount.toLocaleString()} con Informe vs ${agg.chqPresentesCount.toLocaleString()} con Chequeo`}
-                    color="#8b5cf6"
-                    bg="#f5f3ff"
-                />
-                <StatCard
-                    icon={Clock}
-                    label="Demora Promedio al Informe"
-                    value={agg.avgDiasAlInforme > 0 ? `${agg.avgDiasAlInforme} días` : `${agg.totalPendientes} pend.`}
-                    sub={agg.avgDiasAlInforme > 0 ? `Entre Chequeo y Consulta Informe (${agg.totalPendientes} futuros)` : 'Turnos futuros agendados'}
-                    color="#f59e0b"
-                    bg="#fffbeb"
-                />
-            </div>
-
-            {/* Scrollable */}
-            <div style={{ flex: 1, overflow: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-                {/* Gráfico 1: Si estamos en comparativa mostramos Chequeo vs Informe; si no, Asistencia por Mes */}
-                {tipoConsulta === 'comparativa' ? (
-                    <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
-                        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <ClipboardCheck size={18} color="#0284c7" /> Comparativa Mensual: Chequeos Realizados vs. Consultas de Informe ((CHQ) CHEQUEO INFORME)
-                        </h3>
-                        <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 16px 0' }}>
-                            Compara mes a mes cuántos pacientes realizaron su <strong style={{ color: '#10b981' }}>Chequeo Preventivo</strong> frente a cuántos asistieron a la <strong style={{ color: '#0284c7' }}>Consulta de Devolución del Informe</strong>.
-                        </p>
-                        {agg.months.length > 0 ? (
-                            <div style={{ height: 280 }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={agg.months} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
-                                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                                        <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 8px 30px rgba(0,0,0,.08)' }} />
-                                        <Legend wrapperStyle={{ fontSize: '0.75rem', paddingTop: '10px' }} />
-                                        <Bar dataKey="chqPresentes" name="Chequeos Realizados (Presentes)" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={34} />
-                                        <Bar dataKey="infPresentes" name="Consultas de Informe Realizadas (Presentes)" fill="#0284c7" radius={[4, 4, 0, 0]} maxBarSize={34} />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos</div>
-                        )}
-                    </div>
-                ) : (
-                    <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
-                        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <TrendingUp size={18} color="#0284c7" />
-                            {tipoConsulta === 'informe'
-                                ? 'Asistencia Mensual a Consultas de Informe ((CHQ) CHEQUEO INFORME)'
-                                : 'Asistencia Mensual a Chequeos Preventivos ((CHQ) CHEQUEO PREVENTIVO)'}
-                        </h3>
-                        <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 16px 0', maxWidth: '680px' }}>
-                            Desglosa el volumen mensual en: <strong style={{color: '#10b981'}}>Presentes</strong> (asistieron a ver su informe), <strong style={{color: '#ef4444'}}>Ausentes</strong> (faltaron a la cita), y <strong style={{color: '#f59e0b'}}>Pendientes</strong> (turnos futuros agendados).
-                        </p>
-                        {agg.months.length > 0 ? (
-                            <div style={{ height: 280 }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={agg.months} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
-                                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                                        <Tooltip
-                                            cursor={{ fill: '#f8fafc' }}
-                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 30px rgba(0,0,0,.12)' }}
-                                            formatter={(value, name) => [value, name === 'presentes' ? '✅ Presentes' : name === 'ausentes' ? '❌ Ausentes' : '⏳ Pendientes']}
-                                            labelFormatter={l => agg.months.find(m => m.label === l)?.labelFull || l}
-                                        />
-                                        <Legend wrapperStyle={{ fontSize: '0.75rem', paddingTop: '10px' }} formatter={v => v === 'presentes' ? 'Presentes' : v === 'ausentes' ? 'Ausentes' : 'Pendientes'} />
-                                        <ReferenceLine y={avgAgendados} stroke="#64748b" strokeDasharray="3 3" label={{ position: 'insideTopLeft', value: `Promedio Mensual: ${avgAgendados}`, fill: '#64748b', fontSize: 11, fontWeight: 700 }} />
-                                        <Bar dataKey="presentes" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                                        <Bar dataKey="ausentes" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
-                                        <Bar dataKey="pendientes" stackId="a" fill="#fbbf24" radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos</div>
-                        )}
-                    </div>
-                )}
-
-                {/* Comparativa Interanual YoY */}
-                <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-                        <div>
-                            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <TrendingUp size={18} color={yoyMode === 'asistidos' ? '#10b981' : yoyMode === 'ausentes' ? '#ef4444' : '#0284c7'} />
-                                Comparativa Interanual 2024–2026 ({tipoConsulta === 'informe' ? 'Consultas de Informe' : tipoConsulta === 'preventivo' ? 'Chequeos Preventivos' : 'Total Circuito'})
-                            </h3>
-                            <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 0 0', maxWidth: '580px' }}>
-                                Evolución mes a mes entre los años 2024, 2025 y 2026 (independiente del filtro de fechas superior).
-                            </p>
+                    {filtroEdad === 'custom' && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <input type="number" min="0" max="120" placeholder="Min" value={customEdadMin} onChange={e => setCustomEdadMin(e.target.value)} style={{ ...dateInputStyle, width: '54px', textAlign: 'center' }} />
+                            <span style={{ color: '#94A3B8', fontSize: '0.74rem' }}>a</span>
+                            <input type="number" min="0" max="120" placeholder="Max" value={customEdadMax} onChange={e => setCustomEdadMax(e.target.value)} style={{ ...dateInputStyle, width: '54px', textAlign: 'center' }} />
                         </div>
-
-                        <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
-                            {[
-                                { id: 'agendados', label: 'Turnos Agendados', color: '#0284c7' },
-                                { id: 'asistidos', label: 'Turnos Asistidos (Presentes)', color: '#10b981' },
-                                { id: 'ausentes', label: 'Turnos Ausentes', color: '#ef4444' },
-                            ].map(b => (
-                                <button
-                                    key={b.id}
-                                    onClick={() => setYoyMode(b.id)}
-                                    style={{
-                                        padding: '6px 13px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                                        fontSize: '0.76rem', fontWeight: 700, transition: 'all .15s',
-                                        background: yoyMode === b.id ? b.color : 'transparent',
-                                        color: yoyMode === b.id ? '#fff' : '#64748b',
-                                    }}
-                                >
-                                    {b.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    {yoyData.length > 0 ? (
-                        <div style={{ height: 280 }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={yoyData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 600 }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
-                                    <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 30px rgba(0,0,0,.12)' }}
-                                        itemStyle={{ fontSize: '0.85rem', fontWeight: 600 }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: '0.75rem', paddingTop: '10px' }} />
-                                    {[...years].reverse().map((year, i) => (
-                                        <Line key={year} type="monotone" dataKey={year} name={`Año ${year}`} stroke={COLORS[i % COLORS.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                    ))}
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    ) : (
-                        <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos</div>
                     )}
-                </div>
-
-                {/* Tasa de Asistencia + Rangos Etarios + Obras Sociales */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-                    {/* Tasa trend */}
-                    <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
-                        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
-                            Tasa de Asistencia Mensual (%)
-                        </h3>
-                        <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '4px 0 16px 0' }}>
-                            Porcentaje de pacientes que asistieron sobre el total de turnos resueltos.
-                        </p>
-                        {agg.months.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={230}>
-                                <ComposedChart data={agg.months} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                                    <defs>
-                                        <linearGradient id="rateGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#10b981" stopOpacity={0.15} />
-                                            <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
-                                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 8px 30px rgba(0,0,0,.12)' }}
-                                        formatter={v => [`${v}%`, 'Tasa Asistencia']}
-                                        labelFormatter={l => agg.months.find(m => m.label === l)?.labelFull || l}
-                                    />
-                                    <Area dataKey="tasaAsistencia" fill="url(#rateGrad)" stroke="none" />
-                                    <Line dataKey="tasaAsistencia" stroke="#059669" strokeWidth={2.5} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6, fill: '#059669' }} />
-                                </ComposedChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div style={{ height: 230, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos</div>
-                        )}
+                    <button onClick={() => { const prev = getPreviousMonthRange(); setFechaDesde(prev.fechaDesde); setFechaHasta(prev.fechaHasta); }} style={chipBtn}>Mes anterior</button>
+                    <button onClick={() => { setFechaDesde('2026-01-01'); setFechaHasta('2026-12-31'); }} style={{ ...chipBtn, background: '#F0F9FF', color: '#0284C7', borderColor: '#BAE6FD' }}>Año 2026</button>
+                    {(fechaDesde || fechaHasta || filtroEdad !== 'todos') && (
+                        <button onClick={() => { setFechaDesde(''); setFechaHasta(''); setFiltroEdad('todos'); setCustomEdadMin(''); setCustomEdadMax(''); }} style={{ ...chipBtn, background: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA' }}>
+                            Todo (2024–2026)
+                        </button>
+                    )}
+                </>
+            }
+            tabs={[
+                { id: 'asistencia', label: 'Asistencia e Interanual', icon: TrendingUp },
+                { id: 'demografia', label: 'Demografía, Coberturas y Médicos', icon: Users },
+                { id: 'detalle', label: 'Detalle Mensual', icon: Table2, badge: agg.months.length },
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+        >
+            {loading ? (
+                <AnalyticsLoader text="Cargando estadísticas de turnos..." subtext={progress} />
+            ) : activeTab === 'asistencia' ? (
+                <>
+                    {/* 4 KPI Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                        <AnalyticsKpiCard
+                            label={tipoConsulta === 'informe' ? 'Informes Agendados' : tipoConsulta === 'preventivo' ? 'Chequeos Agendados' : 'Total Turnos'}
+                            value={agg.total.toLocaleString('es-AR')}
+                            subtext={`${agg.totalPendientes.toLocaleString('es-AR')} turnos futuros pendientes`}
+                            icon={tipoConsulta === 'informe' ? FileText : CalendarDays}
+                            accent={ANALYTICS_PALETTE.blue}
+                            bg="#F0F9FF"
+                        />
+                        <AnalyticsKpiCard
+                            label="Presentes (Asistieron)"
+                            value={agg.totalPresentes.toLocaleString('es-AR')}
+                            pill={`${agg.tasaGlobal}% asistencia`}
+                            subtext="Efectividad sobre turnos con fecha ya transcurrida."
+                            icon={UserCheck}
+                            accent={ANALYTICS_PALETTE.emerald}
+                            bg="#ECFDF5"
+                        />
+                        <AnalyticsKpiCard
+                            label="Ausentes / Inasistencias"
+                            value={agg.totalAusentes.toLocaleString('es-AR')}
+                            pill={`${agg.totalPresentes + agg.totalAusentes > 0 ? 100 - agg.tasaGlobal : 0}%`}
+                            subtext="Incluye ausencias justificadas, injustificadas y anulaciones."
+                            icon={UserX}
+                            accent={ANALYTICS_PALETTE.rose}
+                            bg="#FFF1F2"
+                        />
+                        <AnalyticsKpiCard
+                            label="Retorno a Consulta Informe"
+                            value={`${agg.tasaRetornoInforme}%`}
+                            pill={agg.avgDiasAlInforme > 0 ? `${agg.avgDiasAlInforme}d prom.` : null}
+                            subtext={`${agg.infPresentesCount.toLocaleString('es-AR')} con Informe vs ${agg.chqPresentesCount.toLocaleString('es-AR')} con Chequeo`}
+                            icon={ClipboardCheck}
+                            accent={ANALYTICS_PALETTE.indigo}
+                            bg="#EEF2FF"
+                        />
                     </div>
 
-                    {/* Rangos Etarios Pie */}
-                    <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px', display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Users size={18} color="#ec4899" /> Distribución por Rangos Etarios
-                        </h3>
-                        <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 14px 0' }}>
-                            Clasificación por edades de pacientes con asistencia presente.
-                        </p>
-                        {agg.ageDistribution.length > 0 ? (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0 }}>
-                                <div style={{ position: 'relative', height: '165px', flexShrink: 0 }}>
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie data={agg.ageDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={72} paddingAngle={3} dataKey="value" stroke="none">
-                                                {agg.ageDistribution.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                                            </Pie>
-                                            <Tooltip formatter={v => [`${v} turnos`, 'Presentes']} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#10b981' }}>{agg.totalPresentes}</div>
-                                        <div style={{ fontSize: '0.62rem', color: '#10b981', fontWeight: 700 }}>PRESENTES</div>
-                                    </div>
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                                    {agg.ageDistribution.map((item, i) => (
-                                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', background: '#f8fafc', padding: '5px 8px', borderRadius: '6px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <div style={{ width: 9, height: 9, borderRadius: 3, background: item.color, flexShrink: 0 }} />
-                                                <span style={{ color: '#475569', fontWeight: 600 }}>{item.name}</span>
-                                            </div>
-                                            <span style={{ fontWeight: 800, color: '#1e293b' }}>{item.value}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ) : <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos de edad</div>}
-                    </div>
-
-                    {/* Obra Social Pie + Sedes */}
-                    <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px', display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
-                            Top Obras Sociales y Sedes
-                        </h3>
-                        {agg.topSedes.length > 0 && (
-                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                                {agg.topSedes.map((s, idx) => (
-                                    <span key={idx} style={{ fontSize: '0.72rem', fontWeight: 700, background: '#eff6ff', color: '#0369a1', padding: '4px 10px', borderRadius: '999px' }}>
-                                        📍 {s.name}: {s.value.toLocaleString()} pres.
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                        {agg.topOS.length > 0 ? (
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0 }}>
-                                <div style={{ position: 'relative', height: '150px', flexShrink: 0 }}>
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie data={agg.topOS} cx="50%" cy="50%" innerRadius={46} outerRadius={68} paddingAngle={2} dataKey="value" stroke="none">
-                                                {agg.topOS.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                                            </Pie>
-                                            <Tooltip formatter={v => [`${v} turnos`, 'Cantidad']} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                                        </PieChart>
+                    {/* Asistencia Mensual + Tasa (%) */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.55fr) minmax(320px, 1fr)', gap: '20px' }}>
+                        <AnalyticsCard
+                            title={tipoConsulta === 'comparativa' ? 'Chequeos vs. Consultas de Informe (Presentes)' : 'Asistencia Mensual Apilada'}
+                            subtitle={tipoConsulta === 'comparativa' ? 'Comparación mes a mes entre estudios realizados y devoluciones médicas' : 'Desglose mensual en Presentes, Ausentes y Pendientes futuros'}
+                            explanation="La línea punteada indica el promedio mensual del período seleccionado para identificar meses por encima o debajo de la media."
+                        >
+                            {agg.months.length > 0 ? (
+                                <div style={{ height: '270px', width: '100%' }}>
+                                    <ResponsiveContainer>
+                                        {tipoConsulta === 'comparativa' ? (
+                                            <ComposedChart data={agg.months} margin={{ top: 6, right: 10, left: -12, bottom: 4 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                                                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                                <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                                                <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
+                                                <Bar dataKey="chqPresentes" name="Chequeos Realizados" fill={ANALYTICS_PALETTE.emerald} radius={[5, 5, 0, 0]} maxBarSize={30} />
+                                                <Bar dataKey="infPresentes" name="Consultas Informe" fill={ANALYTICS_PALETTE.blue} radius={[5, 5, 0, 0]} maxBarSize={30} />
+                                            </ComposedChart>
+                                        ) : (
+                                            <BarChart data={agg.months} margin={{ top: 6, right: 10, left: -12, bottom: 4 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                                                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                                <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                                <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={l => agg.months.find(m => m.label === l)?.labelFull || l} />
+                                                <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
+                                                <ReferenceLine y={avgAgendados} stroke="#64748B" strokeDasharray="3 3" />
+                                                <Bar dataKey="presentes" name="Presentes" stackId="a" fill={ANALYTICS_PALETTE.emerald} />
+                                                <Bar dataKey="ausentes" name="Ausentes" stackId="a" fill={ANALYTICS_PALETTE.rose} />
+                                                <Bar dataKey="pendientes" name="Pendientes" stackId="a" fill={ANALYTICS_PALETTE.amber} radius={[5, 5, 0, 0]} />
+                                            </BarChart>
+                                        )}
                                     </ResponsiveContainer>
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', overflowY: 'auto' }}>
-                                    {agg.topOS.map((os, i) => (
-                                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                                                <div style={{ width: 9, height: 9, borderRadius: 3, background: COLORS[i % COLORS.length], flexShrink: 0 }} />
-                                                <span style={{ color: '#475569', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{os.name}</span>
-                                            </div>
-                                            <span style={{ fontWeight: 700, color: '#1e293b' }}>{os.value}</span>
-                                        </div>
+                            ) : <EmptyChartState />}
+                        </AnalyticsCard>
+
+                        <AnalyticsCard
+                            title="Tasa de Asistencia Mensual (%)"
+                            subtitle="Porcentaje de pacientes que asistieron sobre turnos resueltos"
+                            explanation="Permite evaluar si los recordatorios automáticos por WhatsApp están reduciendo el ausentismo a lo largo del tiempo."
+                        >
+                            {agg.months.length > 0 ? (
+                                <div style={{ height: '270px', width: '100%' }}>
+                                    <ResponsiveContainer>
+                                        <ComposedChart data={agg.months} margin={{ top: 6, right: 10, left: -16, bottom: 4 }}>
+                                            <defs>
+                                                <linearGradient id="asistGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.18} />
+                                                    <stop offset="100%" stopColor="#10B981" stopOpacity={0.01} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                                            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                            <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
+                                            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => [`${v}%`, 'Asistencia']} />
+                                            <Area dataKey="tasaAsistencia" fill="url(#asistGrad)" stroke="none" />
+                                            <Line type="monotone" dataKey="tasaAsistencia" stroke="#059669" strokeWidth={2.4} dot={{ r: 3.5, fill: '#10B981' }} />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : <EmptyChartState />}
+                        </AnalyticsCard>
+                    </div>
+
+                    {/* Comparativa Interanual YoY */}
+                    <AnalyticsCard
+                        title="Comparativa Interanual 2024–2026 (Gráfico de Líneas)"
+                        subtitle="Evolución mes a mes comparando años completos (independiente del rango de fechas superior)"
+                        badge={
+                            <SegmentedControl
+                                value={yoyMode}
+                                onChange={setYoyMode}
+                                options={[
+                                    { id: 'agendados', label: 'Agendados' },
+                                    { id: 'asistidos', label: 'Asistidos' },
+                                    { id: 'ausentes', label: 'Ausentes' },
+                                ]}
+                            />
+                        }
+                        explanation="Permite comparar la estacionalidad de la demanda entre 2024, 2025 y 2026 para planificar agendas y campañas."
+                    >
+                        {yoyData.length > 0 ? (
+                            <div style={{ height: '260px', width: '100%' }}>
+                                <ResponsiveContainer>
+                                    <LineChart data={yoyData} margin={{ top: 8, right: 12, left: -12, bottom: 4 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                        <Tooltip contentStyle={TOOLTIP_STYLE} />
+                                        <Legend wrapperStyle={{ fontSize: '0.76rem' }} />
+                                        {[...years].reverse().map((year, i) => (
+                                            <Line key={year} type="monotone" dataKey={year} name={`Año ${year}`} stroke={CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length]} strokeWidth={2.5} dot={{ r: 3.5 }} />
+                                        ))}
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : <EmptyChartState />}
+                    </AnalyticsCard>
+                </>
+            ) : activeTab === 'demografia' ? (
+                <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                        <AnalyticsCard
+                            title="Histograma de Rangos Etarios"
+                            subtitle="Distribución por edad de los pacientes presentes en el período"
+                            explanation="Muestra qué franjas de edad tienen mayor participación efectiva en chequeos preventivos e informes."
+                        >
+                            {agg.ageDistribution.length > 0 ? (
+                                <div style={{ height: '260px', width: '100%' }}>
+                                    <ResponsiveContainer>
+                                        <BarChart data={agg.ageDistribution} barCategoryGap="10%" margin={{ top: 8, right: 12, left: -12, bottom: 4 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                                            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => [`${v} presentes`, 'Pacientes']} />
+                                            <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                                                {agg.ageDistribution.map((entry, idx) => (
+                                                    <Cell key={idx} fill={entry.color} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : <EmptyChartState text="Sin datos de edad." />}
+                        </AnalyticsCard>
+
+                        <AnalyticsCard
+                            title="Top Obras Sociales y Sedes (Gráfico de Torta)"
+                            subtitle="Distribución de turnos presentes por cobertura médica"
+                            badge={
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                    {agg.topSedes.map((s, idx) => (
+                                        <span key={idx} style={{ fontSize: '0.7rem', fontWeight: 700, background: '#F0F9FF', color: '#0369A1', padding: '3px 8px', borderRadius: '999px' }}>
+                                            {s.name}: {s.value.toLocaleString('es-AR')}
+                                        </span>
                                     ))}
                                 </div>
-                            </div>
-                        ) : <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>Sin datos</div>}
+                            }
+                            explanation="Identifica las coberturas principales que traccionan la demanda en cada sede."
+                        >
+                            {agg.topOS.length > 0 ? (
+                                <div style={{ height: '260px', width: '100%' }}>
+                                    <ResponsiveContainer>
+                                        <PieChart>
+                                            <Pie data={agg.topOS} cx="50%" cy="50%" innerRadius={56} outerRadius={88} paddingAngle={3} dataKey="value" nameKey="name">
+                                                {agg.topOS.map((_e, i) => <Cell key={i} fill={CHART_SERIES_COLORS[i % CHART_SERIES_COLORS.length]} />)}
+                                            </Pie>
+                                            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => [`${v} turnos`, 'Presentes']} />
+                                            <Legend wrapperStyle={{ fontSize: '0.74rem' }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : <EmptyChartState />}
+                        </AnalyticsCard>
                     </div>
-                </div>
 
-                {/* Top Médicos */}
-                {agg.topMedicos.length > 0 && (
-                    <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '20px' }}>
-                        <h3 style={{ margin: '0 0 16px', fontSize: '0.95rem', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Building2 size={18} color="#0284c7" />
-                            {tipoConsulta === 'informe'
-                                ? `Médicos que entregan Informes de Chequeo (${agg.topMedicos.length})`
-                                : `Médicos / Responsables por Turnos (${agg.topMedicos.length})`}
-                        </h3>
-                        <div style={{ maxHeight: '380px', overflowY: 'auto', paddingRight: '6px' }}>
-                            <div style={{ height: Math.max(200, agg.topMedicos.length * 34) }}>
-                                <ResponsiveContainer width="100%" height="100%">
+                    {agg.topMedicos.length > 0 && (
+                        <AnalyticsCard
+                            title={`Top Profesionales por Turnos Presentes (${agg.topMedicos.length})`}
+                            subtitle="Volumen de consultas efectivamente atendidas por profesional en el período"
+                        >
+                            <div style={{ height: Math.max(220, agg.topMedicos.length * 32), width: '100%' }}>
+                                <ResponsiveContainer>
                                     <BarChart data={agg.topMedicos} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                                        <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} width={210} axisLine={false} tickLine={false} />
-                                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} formatter={v => [`${v} consultas presentes`]} />
-                                        <Bar dataKey="value" fill="#0284c7" radius={[0, 4, 4, 0]} maxBarSize={22} />
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
+                                        <XAxis type="number" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} width={200} axisLine={false} tickLine={false} />
+                                        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={v => [`${v} presentes`, 'Consultas']} />
+                                        <Bar dataKey="value" fill={ANALYTICS_PALETTE.blue} radius={[0, 6, 6, 0]} maxBarSize={20} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Tabla Detalle */}
-                <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <h3 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: '#334155' }}>
-                            Detalle Mes a Mes — {tipoConsulta === 'informe' ? 'Consultas de Informe ((CHQ) CHEQUEO INFORME)' : tipoConsulta === 'preventivo' ? 'Chequeos Preventivos' : 'Comparativa Chequeo vs. Informe'} ({agg.months.length} meses)
-                        </h3>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            Consolidado mensual de turnos agendados, asistencias presentes e inasistencias.
-                        </div>
-                    </div>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                        </AnalyticsCard>
+                    )}
+                </>
+            ) : (
+                <AnalyticsCard
+                    title={`Detalle Mes a Mes (${agg.months.length} meses)`}
+                    subtitle="Consolidado mensual de turnos agendados, presentes, ausentes y tasa de asistencia"
+                >
+                    <div style={{ overflowX: 'auto', border: '1px solid #F1F5F9', borderRadius: '10px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                             <thead>
-                                <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
+                                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
                                     {(tipoConsulta === 'comparativa'
-                                        ? ['Mes', 'Chequeos Pres.', 'Informes Agendados', 'Informes Presentes', 'Informes Ausentes', '% Retorno a Informe']
-                                        : ['Mes', 'Agendados', 'Presentes', 'Ausentes', 'Pendientes', 'Tasa Asistencia']
+                                        ? ['Mes', 'Chequeos Pres.', 'Informes Agendados', 'Informes Presentes', 'Informes Ausentes', '% Retorno']
+                                        : ['Mes', 'Agendados', 'Presentes', 'Ausentes', 'Pendientes', 'Asistencia']
                                     ).map(h => (
                                         <th key={h} style={{
-                                            padding: '10px 16px', textAlign: h === 'Mes' ? 'left' : 'right',
-                                            fontWeight: 700, color: '#64748b', fontSize: '0.72rem',
-                                            textTransform: 'uppercase', letterSpacing: '0.5px',
+                                            padding: '10px 14px', textAlign: h === 'Mes' ? 'left' : 'right',
+                                            fontWeight: 700, color: '#64748B', fontSize: '0.7rem', textTransform: 'uppercase',
                                         }}>{h}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
-                                {[...agg.months].reverse().map((m, idx) => (
-                                    <tr key={m.month} style={{
-                                        borderBottom: '1px solid #f8fafc',
-                                        background: idx % 2 === 0 ? '#fff' : '#fafbfc',
-                                    }}>
-                                        <td style={{ padding: '10px 16px', fontWeight: 700, color: '#1e293b' }}>{m.labelFull}</td>
+                                {[...agg.months].reverse().map(m => (
+                                    <tr key={m.month} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                                        <td style={{ padding: '10px 14px', fontWeight: 700, color: '#0F172A' }}>{m.labelFull}</td>
                                         {tipoConsulta === 'comparativa' ? (
                                             <>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, color: '#10b981' }}>{m.chqPresentes}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#64748b', fontWeight: 600 }}>{m.infAgendados}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#0284c7', fontWeight: 700 }}>{m.infPresentes}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>{m.infAusentes}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                                                    <span style={{
-                                                        padding: '2px 10px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700,
-                                                        background: '#e0f2fe', color: '#0369a1',
-                                                    }}>{m.tasaRetornoMes}%</span>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: '#10B981' }}>{m.chqPresentes}</td>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#64748B' }}>{m.infAgendados}</td>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: '#0284C7' }}>{m.infPresentes}</td>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#F43F5E' }}>{m.infAusentes}</td>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                                                    <span style={{ padding: '2px 8px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, background: '#E0F2FE', color: '#0369A1' }}>
+                                                        {m.tasaRetornoMes}%
+                                                    </span>
                                                 </td>
                                             </>
                                         ) : (
                                             <>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>{m.agendados}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#10b981', fontWeight: 700 }}>{m.presentes}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>{m.ausentes}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right', color: '#f59e0b', fontWeight: 600 }}>{m.pendientes}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: '#0284C7' }}>{m.agendados}</td>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: '#10B981' }}>{m.presentes}</td>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#F43F5E' }}>{m.ausentes}</td>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right', color: '#F59E0B' }}>{m.pendientes}</td>
+                                                <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                                                     <span style={{
-                                                        padding: '2px 10px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: 700,
-                                                        background: m.tasaAsistencia >= 70 ? '#ecfdf5' : m.tasaAsistencia >= 40 ? '#fffbeb' : '#fef2f2',
-                                                        color: m.tasaAsistencia >= 70 ? '#059669' : m.tasaAsistencia >= 40 ? '#d97706' : '#dc2626',
+                                                        padding: '2px 8px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700,
+                                                        background: m.tasaAsistencia >= 70 ? '#ECFDF5' : m.tasaAsistencia >= 40 ? '#FFFBEB' : '#FEF2F2',
+                                                        color: m.tasaAsistencia >= 70 ? '#059669' : m.tasaAsistencia >= 40 ? '#D97706' : '#DC2626',
                                                     }}>{m.tasaAsistencia}%</span>
                                                 </td>
                                             </>
@@ -892,41 +625,21 @@ export default function MetricasRecordatoriosPanel({ addToast }) {
                                     </tr>
                                 ))}
                             </tbody>
-                            <tfoot>
-                                <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
-                                    <td style={{ padding: '12px 16px', fontWeight: 800, color: '#1e293b' }}>TOTAL</td>
-                                    {tipoConsulta === 'comparativa' ? (
-                                        <>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#10b981' }}>{agg.chqPresentesCount}</td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#64748b' }}>{agg.infAgendadosCount}</td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>{agg.infPresentesCount}</td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>{agg.months.reduce((s, m) => s + m.infAusentes, 0)}</td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                                                <span style={{ padding: '3px 12px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 800, background: '#e0f2fe', color: '#0369a1' }}>
-                                                    {agg.tasaRetornoInforme}%
-                                                </span>
-                                            </td>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>{agg.total}</td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#10b981' }}>{agg.totalPresentes}</td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>{agg.totalAusentes}</td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#f59e0b' }}>{agg.totalPendientes}</td>
-                                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                                                <span style={{
-                                                    padding: '3px 12px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 800,
-                                                    background: '#ecfdf5', color: '#059669',
-                                                }}>{agg.tasaGlobal}%</span>
-                                            </td>
-                                        </>
-                                    )}
-                                </tr>
-                            </tfoot>
                         </table>
                     </div>
-                </div>
-            </div>
-        </div>
+                </AnalyticsCard>
+            )}
+        </AnalyticsShell>
     );
 }
+
+const chipBtn = {
+    padding: '5px 10px',
+    borderRadius: '8px',
+    border: '1px solid #E2E8F0',
+    background: '#FFFFFF',
+    color: '#475569',
+    fontSize: '0.73rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+};
