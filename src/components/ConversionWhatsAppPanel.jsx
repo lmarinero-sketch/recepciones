@@ -179,8 +179,11 @@ function KpiCard({ label, value, subtext, pill, icon: Icon, accent = '#0284C7', 
 export default function ConversionWhatsAppPanel({ addToast }) {
     // Filtros
     const [datePreset, setDatePreset] = useState('mes'); // '7d' | 'mes' | '30d' | '90d' | 'custom'
-    const [customStart, setCustomStart] = useState('');
-    const [customEnd, setCustomEnd] = useState('');
+    const initialMonthRange = useMemo(() => getDateRangeFromPreset('mes'), []);
+    const [customStart, setCustomStart] = useState(initialMonthRange.startDate);
+    const [customEnd, setCustomEnd] = useState(initialMonthRange.endDate);
+    const [draftStart, setDraftStart] = useState(initialMonthRange.startDate);
+    const [draftEnd, setDraftEnd] = useState(initialMonthRange.endDate);
     const [attributionMode, setAttributionMode] = useState('strict'); // 'strict' | 'broad'
     const [attributionDays, setAttributionDays] = useState(14);
     const [categoriaFilter, setCategoriaFilter] = useState('all');
@@ -203,8 +206,29 @@ export default function ConversionWhatsAppPanel({ addToast }) {
         [datePreset, customStart, customEnd]
     );
 
+    const isValidIsoDate = (str) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(str || '')) return false;
+        const y = Number(str.slice(0, 4));
+        if (y < 2020 || y > 2035) return false;
+        const d = new Date(`${str}T12:00:00`);
+        return !isNaN(d.getTime());
+    };
+
+    const handleApplyCustomDates = () => {
+        if (!isValidIsoDate(draftStart) || !isValidIsoDate(draftEnd)) {
+            addToast?.('Ingresá fechas válidas (ej: 01/01/2026 a 26/11/2026)', 'error');
+            return;
+        }
+        if (draftStart > draftEnd) {
+            addToast?.('La fecha "Desde" no puede ser mayor que "Hasta"', 'error');
+            return;
+        }
+        setCustomStart(draftStart);
+        setCustomEnd(draftEnd);
+    };
+
     const loadData = useCallback(async () => {
-        if (datePreset === 'custom' && (!customStart || !customEnd)) return;
+        if (datePreset === 'custom' && (!isValidIsoDate(customStart) || !isValidIsoDate(customEnd) || customStart > customEnd)) return;
         setLoading(true);
         try {
             const raw = await fetchConversionRawData({ startDate, endDate });
@@ -361,7 +385,15 @@ export default function ConversionWhatsAppPanel({ addToast }) {
                             ].map(p => (
                                 <button
                                     key={p.id}
-                                    onClick={() => setDatePreset(p.id)}
+                                    onClick={() => {
+                                        if (p.id === 'custom' && datePreset !== 'custom') {
+                                            setDraftStart(startDate);
+                                            setDraftEnd(endDate);
+                                            setCustomStart(startDate);
+                                            setCustomEnd(endDate);
+                                        }
+                                        setDatePreset(p.id);
+                                    }}
                                     style={{
                                         padding: '5px 10px', border: 'none', borderRadius: '7px',
                                         fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
@@ -379,14 +411,35 @@ export default function ConversionWhatsAppPanel({ addToast }) {
                         {datePreset === 'custom' && (
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <input
-                                    type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                                    type="date"
+                                    min="2020-01-01"
+                                    max="2035-12-31"
+                                    value={draftStart}
+                                    onChange={e => setDraftStart(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') handleApplyCustomDates(); }}
                                     style={{ padding: '5px 8px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.75rem' }}
                                 />
                                 <span style={{ color: '#94A3B8', fontSize: '0.75rem' }}>a</span>
                                 <input
-                                    type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                                    type="date"
+                                    min="2020-01-01"
+                                    max="2035-12-31"
+                                    value={draftEnd}
+                                    onChange={e => setDraftEnd(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') handleApplyCustomDates(); }}
                                     style={{ padding: '5px 8px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '0.75rem' }}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={handleApplyCustomDates}
+                                    style={{
+                                        padding: '5px 11px', borderRadius: '8px', border: 'none',
+                                        background: '#0284C7', color: '#FFFFFF',
+                                        fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer',
+                                    }}
+                                >
+                                    Aplicar
+                                </button>
                             </div>
                         )}
 
@@ -595,22 +648,34 @@ export default function ConversionWhatsAppPanel({ addToast }) {
                                     </Card>
 
                                     <Card
-                                        title="Evolución Diaria (Gráfico de Líneas)"
-                                        subtitle="Tendencia día por día de consultas ingresadas, respondidas, turnos asignados y concretados"
-                                        explanation="Permite detectar picos de demanda por día de la semana y verificar si los días con mayor volumen de mensajes mantienen la misma tasa de respuesta y asignación de turnos."
+                                        title={
+                                            analytics.seriesGranularity === 'mensual'
+                                                ? 'Evolución Mensual (Gráfico de Líneas)'
+                                                : analytics.seriesGranularity === 'semanal'
+                                                    ? 'Evolución Semanal (Gráfico de Líneas)'
+                                                    : 'Evolución Diaria (Gráfico de Líneas)'
+                                        }
+                                        subtitle={
+                                            analytics.seriesGranularity === 'mensual'
+                                                ? 'Agrupación automática por mes para rangos mayores a 4 meses'
+                                                : analytics.seriesGranularity === 'semanal'
+                                                    ? 'Agrupación automática por semana para rangos de 46 a 120 días'
+                                                    : 'Tendencia día por día de consultas ingresadas, respondidas, turnos asignados y concretados'
+                                        }
+                                        explanation="La escala temporal se ajusta automáticamente (diaria, semanal o mensual) según el rango elegido para mantener la lectura siempre clara y sin solapamientos."
                                     >
                                         <div style={{ height: '270px', width: '100%' }}>
                                             <ResponsiveContainer>
                                                 <LineChart data={analytics.dailySeries} margin={{ top: 8, right: 16, left: -16, bottom: 4 }}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                                                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                                    <XAxis dataKey="label" minTickGap={24} tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
                                                     <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
                                                     <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #E2E8F0', fontSize: '0.78rem' }} />
                                                     <Legend wrapperStyle={{ fontSize: '0.76rem', paddingTop: '6px' }} />
-                                                    <Line type="monotone" dataKey="ingresadas" name="Ingresadas" stroke={PALETTE.blue} strokeWidth={2.2} dot={{ r: 2.5 }} />
+                                                    <Line type="monotone" dataKey="ingresadas" name="Ingresadas" stroke={PALETTE.blue} strokeWidth={2.2} dot={analytics.dailySeries.length <= 35 ? { r: 2.5 } : false} />
                                                     <Line type="monotone" dataKey="respondidas" name="Respondidas" stroke={PALETTE.indigo} strokeWidth={2} dot={false} />
                                                     <Line type="monotone" dataKey="asignados" name="Turno Asignado" stroke={PALETTE.sky} strokeWidth={2} strokeDasharray="4 3" dot={false} />
-                                                    <Line type="monotone" dataKey="concretados" name="Concretados" stroke={PALETTE.emerald} strokeWidth={2.4} dot={{ r: 2.5 }} />
+                                                    <Line type="monotone" dataKey="concretados" name="Concretados" stroke={PALETTE.emerald} strokeWidth={2.4} dot={analytics.dailySeries.length <= 35 ? { r: 2.5 } : false} />
                                                 </LineChart>
                                             </ResponsiveContainer>
                                         </div>

@@ -98,7 +98,34 @@ export function computeConversionAnalytics(rawData, {
 
     const startMs = new Date(`${startDate}T00:00:00-03:00`).getTime();
     const endMs = new Date(`${endDate}T23:59:59-03:00`).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs > endMs) {
+        return null;
+    }
     const todayStr = new Date().toISOString().slice(0, 10);
+
+    // Granularidad adaptativa para que el gráfico de líneas se vea impecable en 7 días, 90 días o 1+ año
+    const diffDays = Math.max(1, Math.round((endMs - startMs) / (1000 * 60 * 60 * 24)));
+    const seriesGranularity = diffDays <= 45 ? 'diaria' : diffDays <= 120 ? 'semanal' : 'mensual';
+    const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+    const getBucketKeyAndLabel = (dateStr) => {
+        if (seriesGranularity === 'mensual') {
+            const [y, m] = dateStr.split('-');
+            const mIdx = Math.max(0, Math.min(11, parseInt(m, 10) - 1));
+            return { key: `${y}-${m}`, label: `${MONTH_SHORT[mIdx]} ${y.slice(2)}` };
+        }
+        if (seriesGranularity === 'semanal') {
+            const d = new Date(`${dateStr}T12:00:00`);
+            const day = d.getDay(); // 0=Dom..6=Sab
+            const diffToMon = (day === 0 ? -6 : 1 - day);
+            d.setDate(d.getDate() + diffToMon);
+            const wkKey = d.toISOString().slice(0, 10);
+            const wkLabel = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+            return { key: wkKey, label: `Sem ${wkLabel}` };
+        }
+        const [, m, dd] = dateStr.split('-');
+        return { key: dateStr, label: `${dd}/${m}` };
+    };
 
     // 1. Agrupar mensajes por teléfono
     const byPhone = new Map();
@@ -148,20 +175,24 @@ export function computeConversionAnalytics(rawData, {
     const frtMinutesList = [];
     const dailyMap = new Map();
 
-    // Inicializar días del período
+    // Inicializar buckets del período según granularidad (diaria / semanal / mensual) con tope de seguridad
     const curDay = new Date(`${startDate}T12:00:00`);
     const endDay = new Date(`${endDate}T12:00:00`);
-    while (curDay <= endDay) {
-        const key = curDay.toISOString().slice(0, 10);
-        const label = curDay.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
-        dailyMap.set(key, {
-            dateKey: key,
-            label,
-            ingresadas: 0,
-            respondidas: 0,
-            asignados: 0,
-            concretados: 0,
-        });
+    let safetyCounter = 0;
+    while (curDay <= endDay && safetyCounter < 2000) {
+        safetyCounter++;
+        const isoDay = curDay.toISOString().slice(0, 10);
+        const { key, label } = getBucketKeyAndLabel(isoDay);
+        if (!dailyMap.has(key)) {
+            dailyMap.set(key, {
+                dateKey: key,
+                label,
+                ingresadas: 0,
+                respondidas: 0,
+                asignados: 0,
+                concretados: 0,
+            });
+        }
         curDay.setDate(curDay.getDate() + 1);
     }
 
@@ -295,9 +326,10 @@ export function computeConversionAnalytics(rawData, {
             else sexoCounts['Sin dato']++;
         }
 
-        // Acumular serie diaria
-        if (dailyMap.has(firstIncDate)) {
-            const d = dailyMap.get(firstIncDate);
+        // Acumular serie temporal según granularidad adaptativa
+        const { key: bucketKey } = getBucketKeyAndLabel(firstIncDate);
+        if (dailyMap.has(bucketKey)) {
+            const d = dailyMap.get(bucketKey);
             d.ingresadas++;
             if (respondida) d.respondidas++;
             if (hasTurno) d.asignados++;
@@ -379,6 +411,7 @@ export function computeConversionAnalytics(rawData, {
             { stage: '4. Concretados', count: totalConcretados, pct: pct(totalConcretados, totalIngresadas), fill: '#10B981' },
         ],
         dailySeries: [...dailyMap.values()],
+        seriesGranularity,
         asistenciaPie: Object.entries(asistenciaCounts)
             .filter(([, v]) => v > 0)
             .map(([name, value]) => ({ name, value })),
