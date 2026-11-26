@@ -304,6 +304,13 @@ export function computeConversionAnalytics(rawData, {
             if (estadoPaciente === 'Concretado') d.concretados++;
         }
 
+        const sortedUniqueTurnos = [...uniqueTurnos].sort((a, b) =>
+            `${a.fecha_visita || ''} ${a.hora_visita || ''}`.localeCompare(`${b.fecha_visita || ''} ${b.hora_visita || ''}`)
+        );
+        const allCandidateTurnos = [...new Map(candidateTurnos.map(t => [t.id_visita, t])).values()].sort((a, b) =>
+            `${a.fecha_visita || ''} ${a.hora_visita || ''}`.localeCompare(`${b.fecha_visita || ''} ${b.hora_visita || ''}`)
+        );
+
         rows.push({
             phone: entry.phone,
             paciente: bestTurno?.paciente || entry.senderName || entry.phone,
@@ -323,6 +330,8 @@ export function computeConversionAnalytics(rawData, {
             usuarioCreacion: bestTurno?.usuario_creacion || '—',
             estadoPaciente,
             cantidadTurnos: uniqueTurnos.length,
+            turnosDetalle: sortedUniqueTurnos,
+            allTurnosPaciente: allCandidateTurnos,
         });
     }
 

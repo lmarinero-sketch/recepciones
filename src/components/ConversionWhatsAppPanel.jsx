@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     TrendingUp, RefreshCw, MessageSquare, CheckCircle2, CalendarCheck,
     UserCheck, Clock, Info, Download, Search, PieChart as PieIcon,
-    BarChart3, Users, Table2, ArrowRight, Filter
+    BarChart3, Users, Table2, ArrowRight, Filter, X, Building2, Stethoscope, Calendar
 } from 'lucide-react';
 import {
     ResponsiveContainer,
@@ -192,9 +192,11 @@ export default function ConversionWhatsAppPanel({ addToast }) {
     const [rawData, setRawData] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Filtros tabla auditoría
+    // Filtros tabla auditoría + Modal resumen de visitas del paciente
     const [auditSearch, setAuditSearch] = useState('');
     const [auditStatusFilter, setAuditStatusFilter] = useState('all');
+    const [selectedAuditRow, setSelectedAuditRow] = useState(null);
+    const [showAllPatientVisits, setShowAllPatientVisits] = useState(false);
 
     const { startDate, endDate } = useMemo(
         () => getDateRangeFromPreset(datePreset, customStart, customEnd),
@@ -960,7 +962,18 @@ export default function ConversionWhatsAppPanel({ addToast }) {
                                                             : { bg: '#F1F5F9', color: '#64748B' };
 
                                                 return (
-                                                    <tr key={`${r.phone}-${idx}`} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                                                    <tr
+                                                        key={`${r.phone}-${idx}`}
+                                                        onClick={() => { setSelectedAuditRow(r); setShowAllPatientVisits(false); }}
+                                                        style={{
+                                                            borderBottom: '1px solid #F1F5F9',
+                                                            cursor: 'pointer',
+                                                            transition: 'background 0.12s',
+                                                        }}
+                                                        onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC'; }}
+                                                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                                                        title="Clic para ver el resumen de visitas relacionadas al chequeo de este paciente"
+                                                    >
                                                         <td style={{ padding: '9px 12px' }}>
                                                             <div style={{ fontWeight: 700, color: '#0F172A' }}>{r.paciente}</div>
                                                             <div style={{ fontSize: '0.7rem', color: '#64748B' }}>{r.phone}{r.dni ? ` · DNI ${r.dni}` : ''}</div>
@@ -1021,6 +1034,221 @@ export default function ConversionWhatsAppPanel({ addToast }) {
                     </div>
                 )}
             </div>
+
+            {/* ========== MODAL RESUMEN DE VISITAS DEL PACIENTE ========== */}
+            {selectedAuditRow && (() => {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const visitas = showAllPatientVisits
+                    ? (selectedAuditRow.allTurnosPaciente || [])
+                    : (selectedAuditRow.turnosDetalle || []);
+                const presentesCount = visitas.filter(v => (v.asistencia || '').toLowerCase() === 'presente').length;
+                const futurosCount = visitas.filter(v => (v.asistencia || '').toLowerCase() !== 'presente' && v.fecha_visita >= todayStr).length;
+                const ausentesCount = Math.max(0, visitas.length - presentesCount - futurosCount);
+
+                const getCatColors = (cat) => {
+                    if (cat === 'Chequeo Preventivo') return { bg: '#ECFDF5', color: '#059669', border: '#A7F3D0' };
+                    if (cat === 'Chequeo Informe') return { bg: '#F0F9FF', color: '#0284C7', border: '#BAE6FD' };
+                    if (cat === 'Ecografía') return { bg: '#EEF2FF', color: '#4F46E5', border: '#C7D2FE' };
+                    return { bg: '#F8FAFC', color: '#475569', border: '#E2E8F0' };
+                };
+
+                return (
+                    <div
+                        onClick={() => setSelectedAuditRow(null)}
+                        style={{
+                            position: 'fixed', inset: 0, zIndex: 10040,
+                            background: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(3px)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '20px',
+                        }}
+                    >
+                        <div
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                                background: '#FFFFFF',
+                                borderRadius: '16px',
+                                border: '1px solid #E2E8F0',
+                                boxShadow: '0 24px 50px rgba(15, 23, 42, 0.2)',
+                                width: '100%',
+                                maxWidth: '760px',
+                                maxHeight: '86vh',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden',
+                            }}
+                        >
+                            {/* Header Modal */}
+                            <div style={{
+                                padding: '18px 22px',
+                                borderBottom: '1px solid #E2E8F0',
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px',
+                            }}>
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' }}>
+                                            {selectedAuditRow.paciente}
+                                        </h3>
+                                        {selectedAuditRow.dni && (
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: '#F1F5F9', color: '#475569' }}>
+                                                DNI {selectedAuditRow.dni}
+                                            </span>
+                                        )}
+                                        {selectedAuditRow.edad !== null && (
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: '#F0F9FF', color: '#0369A1' }}>
+                                                {selectedAuditRow.edad} años
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div style={{ marginTop: '4px', fontSize: '0.76rem', color: '#64748B', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                                        <span>Tel: <strong>{selectedAuditRow.phone}</strong></span>
+                                        {selectedAuditRow.obraSocial && selectedAuditRow.obraSocial !== '—' && (
+                                            <span>· Cobertura: <strong>{selectedAuditRow.obraSocial}</strong></span>
+                                        )}
+                                        <span>· Consulta WA: <strong>{new Date(selectedAuditRow.fechaConsulta).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</strong></span>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedAuditRow(null)}
+                                    style={{
+                                        width: '30px', height: '30px', borderRadius: '8px',
+                                        border: '1px solid #E2E8F0', background: '#FFFFFF',
+                                        color: '#64748B', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            {/* Resumen rápido + Toggle */}
+                            <div style={{
+                                padding: '12px 22px',
+                                background: '#F8FAFC',
+                                borderBottom: '1px solid #E2E8F0',
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px',
+                            }}>
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '0.76rem' }}>
+                                    <span style={{ padding: '4px 10px', borderRadius: '8px', background: '#FFFFFF', border: '1px solid #E2E8F0', fontWeight: 700, color: '#0F172A' }}>
+                                        Total visitas: {visitas.length}
+                                    </span>
+                                    <span style={{ padding: '4px 10px', borderRadius: '8px', background: '#DCFCE7', fontWeight: 700, color: '#15803D' }}>
+                                        Presentes: {presentesCount}
+                                    </span>
+                                    {futurosCount > 0 && (
+                                        <span style={{ padding: '4px 10px', borderRadius: '8px', background: '#E0F2FE', fontWeight: 700, color: '#0369A1' }}>
+                                            Futuros: {futurosCount}
+                                        </span>
+                                    )}
+                                    {ausentesCount > 0 && (
+                                        <span style={{ padding: '4px 10px', borderRadius: '8px', background: '#FEE2E2', fontWeight: 700, color: '#B91C1C' }}>
+                                            Ausentes: {ausentesCount}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {(selectedAuditRow.allTurnosPaciente?.length || 0) > (selectedAuditRow.turnosDetalle?.length || 0) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAllPatientVisits(prev => !prev)}
+                                        style={{
+                                            padding: '5px 10px', borderRadius: '8px',
+                                            border: '1px solid #CBD5E1', background: '#FFFFFF',
+                                            color: '#0284C7', fontSize: '0.73rem', fontWeight: 700, cursor: 'pointer',
+                                        }}
+                                    >
+                                        {showAllPatientVisits
+                                            ? `Ver solo atribuidas (${selectedAuditRow.turnosDetalle?.length || 0})`
+                                            : `Ver todas en SALUS (${selectedAuditRow.allTurnosPaciente?.length || 0})`}
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Lista de Visitas */}
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {visitas.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94A3B8', fontSize: '0.84rem' }}>
+                                        Este paciente no tiene turnos atribuidos en SALUS para el filtro seleccionado.
+                                    </div>
+                                ) : (
+                                    visitas.map((v, i) => {
+                                        const isPres = (v.asistencia || '').toLowerCase() === 'presente';
+                                        const isFut = !isPres && v.fecha_visita >= todayStr;
+                                        const catStyle = getCatColors(v.categoria_turno);
+                                        const statusLabel = isPres ? 'Presente' : isFut ? 'Pendiente Futuro' : (v.asistencia || 'Ausente / Sin marcar');
+                                        const statusStyle = isPres
+                                            ? { bg: '#DCFCE7', color: '#15803D' }
+                                            : isFut
+                                                ? { bg: '#E0F2FE', color: '#0369A1' }
+                                                : { bg: '#FEE2E2', color: '#B91C1C' };
+
+                                        return (
+                                            <div
+                                                key={v.id_visita || i}
+                                                style={{
+                                                    padding: '12px 14px',
+                                                    borderRadius: '11px',
+                                                    border: '1px solid #E2E8F0',
+                                                    background: '#FFFFFF',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '6px',
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                        <span style={{
+                                                            fontSize: '0.69rem', fontWeight: 700, padding: '2px 8px',
+                                                            borderRadius: '6px', background: catStyle.bg,
+                                                            color: catStyle.color, border: `1px solid ${catStyle.border}`,
+                                                        }}>
+                                                            {v.categoria_turno}
+                                                        </span>
+                                                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A' }}>
+                                                            {v.tipo_visita || v.especialidad || 'Consulta'}
+                                                        </span>
+                                                    </div>
+                                                    <span style={{
+                                                        fontSize: '0.7rem', fontWeight: 700, padding: '2px 9px',
+                                                        borderRadius: '999px', background: statusStyle.bg, color: statusStyle.color,
+                                                    }}>
+                                                        {statusLabel}
+                                                    </span>
+                                                </div>
+
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.74rem', color: '#475569' }}>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600, color: '#0F172A' }}>
+                                                        <Calendar size={12} color="#0284C7" />
+                                                        {new Date(v.fecha_visita + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                        {v.hora_visita ? ` · ${v.hora_visita} hs` : ''}
+                                                    </span>
+                                                    {v.medico && (
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Stethoscope size={12} color="#64748B" /> {v.medico}
+                                                        </span>
+                                                    )}
+                                                    {v.centro && (
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Building2 size={12} color="#64748B" /> {v.centro}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {(v.fecha_creacion || v.usuario_creacion) && (
+                                                    <div style={{ fontSize: '0.69rem', color: '#94A3B8' }}>
+                                                        Turno asignado en SALUS
+                                                        {v.fecha_creacion ? ` el ${new Date(v.fecha_creacion).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
+                                                        {v.usuario_creacion ? ` por ${v.usuario_creacion}` : ''}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
